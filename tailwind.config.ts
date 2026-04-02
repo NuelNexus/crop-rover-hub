@@ -13,6 +13,10 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ['DM Sans', 'sans-serif'],
+        display: ['Outfit', 'sans-serif'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -57,6 +61,13 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        success: "hsl(var(--success))",
+        warning: "hsl(var(--warning))",
+        "chart-green": "hsl(var(--chart-green))",
+        "chart-yellow": "hsl(var(--chart-yellow))",
+        "chart-orange": "hsl(var(--chart-orange))",
+        "chart-red": "hsl(var(--chart-red))",
+        "chart-blue": "hsl(var(--chart-blue))",
       },
       borderRadius: {
         lg: "var(--radius)",
