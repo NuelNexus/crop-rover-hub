@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
+  Home,
   LayoutDashboard,
   BarChart3,
   Sprout,
@@ -18,7 +19,8 @@ import {
 } from "lucide-react";
 
 const navItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+  { icon: Home, label: "Home", path: "/" },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: BarChart3, label: "Analytics", path: "/analytics" },
   { icon: Sprout, label: "Crops", path: "/crops" },
   { icon: Bot, label: "CropRover", path: "/croprover" },
