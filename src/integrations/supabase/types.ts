@@ -14,7 +14,305 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      alerts: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+          severity: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message: string
+          severity?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          severity?: string
+        }
+        Relationships: []
+      }
+      crops: {
+        Row: {
+          category: string
+          created_at: string
+          expected_harvest: string | null
+          field_location: string | null
+          id: string
+          name: string
+          notes: string | null
+          planted_date: string | null
+          progress: number
+          stage: string
+          updated_at: string
+          yield_amount: number | null
+          yield_unit: string | null
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          expected_harvest?: string | null
+          field_location?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          planted_date?: string | null
+          progress?: number
+          stage?: string
+          updated_at?: string
+          yield_amount?: number | null
+          yield_unit?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          expected_harvest?: string | null
+          field_location?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          planted_date?: string | null
+          progress?: number
+          stage?: string
+          updated_at?: string
+          yield_amount?: number | null
+          yield_unit?: string | null
+        }
+        Relationships: []
+      }
+      farm_notes: {
+        Row: {
+          created_at: string
+          id: string
+          text: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          text: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          text?: string
+        }
+        Relationships: []
+      }
+      financial_records: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          record_date: string
+          type: string
+        }
+        Insert: {
+          amount: number
+          category: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          record_date?: string
+          type: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          record_date?: string
+          type?: string
+        }
+        Relationships: []
+      }
+      harvests: {
+        Row: {
+          created_at: string
+          crop_name: string
+          field: string
+          harvest_date: string
+          id: string
+          notes: string | null
+          quality_grade: string | null
+          quantity: number
+          unit: string
+        }
+        Insert: {
+          created_at?: string
+          crop_name: string
+          field: string
+          harvest_date?: string
+          id?: string
+          notes?: string | null
+          quality_grade?: string | null
+          quantity: number
+          unit?: string
+        }
+        Update: {
+          created_at?: string
+          crop_name?: string
+          field?: string
+          harvest_date?: string
+          id?: string
+          notes?: string | null
+          quality_grade?: string | null
+          quantity?: number
+          unit?: string
+        }
+        Relationships: []
+      }
+      marketplace_products: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          price: number
+          price_unit: string
+          rating: number | null
+          seller: string
+          stock_status: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          price: number
+          price_unit?: string
+          rating?: number | null
+          seller: string
+          stock_status?: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          price?: number
+          price_unit?: string
+          rating?: number | null
+          seller?: string
+          stock_status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      storage_bins: {
+        Row: {
+          bin_name: string
+          created_at: string
+          crop_stored: string
+          fill_percentage: number
+          humidity: number
+          id: string
+          spoilage_risk: string
+          status: string
+          temperature: number
+          updated_at: string
+        }
+        Insert: {
+          bin_name: string
+          created_at?: string
+          crop_stored: string
+          fill_percentage?: number
+          humidity?: number
+          id?: string
+          spoilage_risk?: string
+          status?: string
+          temperature?: number
+          updated_at?: string
+        }
+        Update: {
+          bin_name?: string
+          created_at?: string
+          crop_stored?: string
+          fill_percentage?: number
+          humidity?: number
+          id?: string
+          spoilage_risk?: string
+          status?: string
+          temperature?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      traceability_batches: {
+        Row: {
+          batch_code: string
+          created_at: string
+          id: string
+          product_name: string
+        }
+        Insert: {
+          batch_code: string
+          created_at?: string
+          id?: string
+          product_name: string
+        }
+        Update: {
+          batch_code?: string
+          created_at?: string
+          id?: string
+          product_name?: string
+        }
+        Relationships: []
+      }
+      traceability_steps: {
+        Row: {
+          batch_id: string
+          created_at: string
+          id: string
+          is_done: boolean
+          label: string
+          location: string
+          sort_order: number
+          step_date: string
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          id?: string
+          is_done?: boolean
+          label: string
+          location: string
+          sort_order?: number
+          step_date: string
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          id?: string
+          is_done?: boolean
+          label?: string
+          location?: string
+          sort_order?: number
+          step_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "traceability_steps_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "traceability_batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
