@@ -196,7 +196,7 @@ const HomePage = () => {
           <div className="bg-secondary rounded-2xl p-5 mb-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-muted-foreground">{new Date().toLocaleDateString("en-US", { city: "short", day: "numeric", month: "short", year: "numeric" })}</p>
+                <p className="text-xs text-muted-foreground">{new Date().toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}</p>
                 <p className="font-display text-5xl font-bold mt-1">29<span className="text-xl align-top">°C</span></p>
                 <p className="text-xs text-muted-foreground mt-1">Humidity 65%</p>
               </div>
