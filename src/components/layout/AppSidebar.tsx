@@ -1,21 +1,10 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import {
-  Home,
-  LayoutDashboard,
-  BarChart3,
-  Sprout,
-  Tractor,
-  DollarSign,
-  CloudSun,
-  Settings,
-  LogOut,
-  Bot,
-  Warehouse,
-  ShoppingCart,
-  FileSearch,
-  Menu,
-  X,
+  Home, LayoutDashboard, BarChart3, Sprout, Tractor, DollarSign,
+  CloudSun, Settings, LogOut, Bot, Warehouse, ShoppingCart, FileSearch,
+  Menu, X, Brain, Cpu,
 } from "lucide-react";
 
 const navItems = [
@@ -23,7 +12,9 @@ const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: BarChart3, label: "Analytics", path: "/analytics" },
   { icon: Sprout, label: "Crops", path: "/crops" },
+  { icon: Brain, label: "AI Analysis", path: "/ai-analysis" },
   { icon: Bot, label: "CropRover", path: "/croprover" },
+  { icon: Cpu, label: "ESP32 Devices", path: "/esp32" },
   { icon: Warehouse, label: "Storage", path: "/storage" },
   { icon: Tractor, label: "Harvesting", path: "/harvesting" },
   { icon: DollarSign, label: "Finances", path: "/finances" },
@@ -35,7 +26,14 @@ const navItems = [
 
 const AppSidebar = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { signOut, user } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/auth");
+  };
 
   const sidebar = (
     <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground">
@@ -46,9 +44,12 @@ const AppSidebar = () => {
             agri<span className="text-sidebar-primary">Cultur</span>
           </span>
         </div>
+        {user && (
+          <p className="text-xs text-sidebar-foreground/60 mt-1 truncate">{user.email}</p>
+        )}
       </div>
 
-      <nav className="flex-1 px-3 space-y-1">
+      <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
           const active = location.pathname === item.path;
           return (
@@ -57,9 +58,7 @@ const AppSidebar = () => {
               to={item.path}
               onClick={() => setMobileOpen(false)}
               className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                active
-                  ? "sidebar-active"
-                  : "hover:bg-sidebar-accent"
+                active ? "sidebar-active" : "hover:bg-sidebar-accent"
               }`}
             >
               <item.icon className="w-5 h-5" />
@@ -70,7 +69,10 @@ const AppSidebar = () => {
       </nav>
 
       <div className="px-3 pb-6">
-        <button className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-sidebar-accent w-full transition-colors text-sidebar-foreground">
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-sidebar-accent w-full transition-colors text-sidebar-foreground"
+        >
           <LogOut className="w-5 h-5" />
           Logout
         </button>
@@ -80,7 +82,6 @@ const AppSidebar = () => {
 
   return (
     <>
-      {/* Mobile toggle */}
       <button
         onClick={() => setMobileOpen(!mobileOpen)}
         className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-card rounded-lg shadow-md border border-border"
@@ -88,28 +89,16 @@ const AppSidebar = () => {
         {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
       </button>
 
-      {/* Mobile overlay */}
       {mobileOpen && (
-        <div
-          className="lg:hidden fixed inset-0 bg-foreground/30 z-40"
-          onClick={() => setMobileOpen(false)}
-        />
+        <div className="lg:hidden fixed inset-0 bg-foreground/30 z-40" onClick={() => setMobileOpen(false)} />
       )}
 
-      {/* Mobile sidebar */}
-      <aside
-        className={`lg:hidden fixed inset-y-0 left-0 z-40 w-64 transform transition-transform ${
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
+      <aside className={`lg:hidden fixed inset-y-0 left-0 z-40 w-64 transform transition-transform ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
         {sidebar}
       </aside>
 
-      {/* Desktop sidebar */}
       <aside className="hidden lg:block w-64 min-h-screen flex-shrink-0">
-        <div className="fixed w-64 h-screen overflow-y-auto">
-          {sidebar}
-        </div>
+        <div className="fixed w-64 h-screen overflow-y-auto">{sidebar}</div>
       </aside>
     </>
   );

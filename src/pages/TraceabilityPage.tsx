@@ -64,14 +64,14 @@ const TraceabilityPage = () => {
                 <input value={stepForm.label} onChange={e => setStepForm({ ...stepForm, label: e.target.value })} placeholder="Step (e.g. Inspected)" className="flex-1 px-3 py-2 rounded-xl border border-border bg-background text-sm" />
                 <input value={stepForm.step_date} onChange={e => setStepForm({ ...stepForm, step_date: e.target.value })} placeholder="Date" className="px-3 py-2 rounded-xl border border-border bg-background text-sm w-40" />
                 <input value={stepForm.location} onChange={e => setStepForm({ ...stepForm, location: e.target.value })} placeholder="Location" className="px-3 py-2 rounded-xl border border-border bg-background text-sm w-32" />
-                <button onClick={() => handleAddStep(item.id, Math.max(0, ...item.steps.map(s => s.sort_order)))} className="bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-medium">Add</button>
+                <button onClick={() => handleAddStep(item.id, Math.max(0, ...item.traceability_steps.map(s => s.sort_order)))} className="bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-medium">Add</button>
               </div>
             )}
 
             <div className="space-y-0">
-              {item.steps.map((s, i) => (
+              {item.traceability_steps.map((s, i) => (
                 <div key={s.id} className="flex items-start gap-3 pb-4 relative">
-                  {i < item.steps.length - 1 && <div className="absolute left-[11px] top-6 w-0.5 h-full bg-border" />}
+                  {i < item.traceability_steps.length - 1 && <div className="absolute left-[11px] top-6 w-0.5 h-full bg-border" />}
                   <button
                     onClick={() => toggleStep.mutate({ id: s.id, is_done: !s.is_done })}
                     className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${s.is_done ? "bg-primary" : "bg-secondary hover:bg-primary/20"}`}

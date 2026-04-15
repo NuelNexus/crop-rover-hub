@@ -21,6 +21,7 @@ export type Database = {
           is_read: boolean
           message: string
           severity: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -28,6 +29,7 @@ export type Database = {
           is_read?: boolean
           message: string
           severity?: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -35,6 +37,7 @@ export type Database = {
           is_read?: boolean
           message?: string
           severity?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -51,6 +54,7 @@ export type Database = {
           progress: number
           stage: string
           updated_at: string
+          user_id: string | null
           yield_amount: number | null
           yield_unit: string | null
         }
@@ -66,6 +70,7 @@ export type Database = {
           progress?: number
           stage?: string
           updated_at?: string
+          user_id?: string | null
           yield_amount?: number | null
           yield_unit?: string | null
         }
@@ -81,26 +86,101 @@ export type Database = {
           progress?: number
           stage?: string
           updated_at?: string
+          user_id?: string | null
           yield_amount?: number | null
           yield_unit?: string | null
         }
         Relationships: []
+      }
+      esp32_devices: {
+        Row: {
+          api_key: string
+          created_at: string
+          device_name: string
+          device_type: string
+          id: string
+          ip_address: string | null
+          is_online: boolean
+          last_seen: string | null
+          user_id: string
+        }
+        Insert: {
+          api_key?: string
+          created_at?: string
+          device_name: string
+          device_type?: string
+          id?: string
+          ip_address?: string | null
+          is_online?: boolean
+          last_seen?: string | null
+          user_id: string
+        }
+        Update: {
+          api_key?: string
+          created_at?: string
+          device_name?: string
+          device_type?: string
+          id?: string
+          ip_address?: string | null
+          is_online?: boolean
+          last_seen?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      esp32_sensor_readings: {
+        Row: {
+          created_at: string
+          device_id: string
+          id: string
+          sensor_type: string
+          unit: string
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          device_id: string
+          id?: string
+          sensor_type: string
+          unit: string
+          value: number
+        }
+        Update: {
+          created_at?: string
+          device_id?: string
+          id?: string
+          sensor_type?: string
+          unit?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "esp32_sensor_readings_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "esp32_devices"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       farm_notes: {
         Row: {
           created_at: string
           id: string
           text: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           text: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           text?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -113,6 +193,7 @@ export type Database = {
           id: string
           record_date: string
           type: string
+          user_id: string | null
         }
         Insert: {
           amount: number
@@ -122,6 +203,7 @@ export type Database = {
           id?: string
           record_date?: string
           type: string
+          user_id?: string | null
         }
         Update: {
           amount?: number
@@ -131,6 +213,7 @@ export type Database = {
           id?: string
           record_date?: string
           type?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -145,6 +228,7 @@ export type Database = {
           quality_grade: string | null
           quantity: number
           unit: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -156,6 +240,7 @@ export type Database = {
           quality_grade?: string | null
           quantity: number
           unit?: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -167,8 +252,50 @@ export type Database = {
           quality_grade?: string | null
           quantity?: number
           unit?: string
+          user_id?: string | null
         }
         Relationships: []
+      }
+      marketplace_orders: {
+        Row: {
+          created_at: string
+          id: string
+          product_id: string | null
+          product_name: string
+          quantity: number
+          status: string
+          total_price: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_id?: string | null
+          product_name: string
+          quantity?: number
+          status?: string
+          total_price: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+          status?: string
+          total_price?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_orders_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       marketplace_products: {
         Row: {
@@ -183,6 +310,7 @@ export type Database = {
           seller: string
           stock_status: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           category?: string | null
@@ -196,6 +324,7 @@ export type Database = {
           seller: string
           stock_status?: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           category?: string | null
@@ -209,6 +338,34 @@ export type Database = {
           seller?: string
           stock_status?: string
           updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -224,6 +381,7 @@ export type Database = {
           status: string
           temperature: number
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           bin_name: string
@@ -236,6 +394,7 @@ export type Database = {
           status?: string
           temperature?: number
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           bin_name?: string
@@ -248,6 +407,7 @@ export type Database = {
           status?: string
           temperature?: number
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -257,18 +417,21 @@ export type Database = {
           created_at: string
           id: string
           product_name: string
+          user_id: string | null
         }
         Insert: {
           batch_code: string
           created_at?: string
           id?: string
           product_name: string
+          user_id?: string | null
         }
         Update: {
           batch_code?: string
           created_at?: string
           id?: string
           product_name?: string
+          user_id?: string | null
         }
         Relationships: []
       }

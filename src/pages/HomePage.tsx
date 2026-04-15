@@ -1,21 +1,16 @@
 import { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
-import { Search, CloudSun, Droplets, Wind, Gauge, Sun, Clock, ChevronDown, Star, ShoppingCart, Plus, Sprout, BarChart3, User, Home as HomeIcon } from "lucide-react";
+import { Search, CloudSun, Plus, Star, ShoppingCart, ChevronDown, Sun } from "lucide-react";
 import { useNotes, useAddNote } from "@/hooks/useNotes";
 import { useProducts } from "@/hooks/useMarketplace";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import plantImg from "@/assets/plant-monstera.png";
 import farmImg from "@/assets/farm-landscape.jpg";
 import { formatDistanceToNow } from "date-fns";
 
-const categories = [
-  { icon: Clock, label: "Duration" },
-  { icon: BarChart3, label: "Return" },
-  { icon: Sprout, label: "Low Risk" },
-  { icon: Gauge, label: "Safety" },
-];
-
 const HomePage = () => {
+  const { user } = useAuth();
   const { data: notes, isLoading: notesLoading } = useNotes();
   const { data: products } = useProducts();
   const addNote = useAddNote();
@@ -24,6 +19,7 @@ const HomePage = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
   const firstProduct = products?.[0];
+  const displayName = user?.user_metadata?.display_name || user?.email?.split("@")[0] || "Farmer";
 
   const handleAddNote = () => {
     if (!newNote.trim()) return;
@@ -42,12 +38,14 @@ const HomePage = () => {
         <div className="bg-card rounded-3xl p-6 shadow-sm border border-border flex flex-col">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <p className="text-muted-foreground text-sm">Hello, Good Morning</p>
+              <p className="text-muted-foreground text-sm">Hello, {displayName}</p>
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 {new Date().toLocaleDateString("en-US", { weekday: "long", day: "2-digit", month: "short", year: "numeric" })} <ChevronDown className="w-3 h-3" />
               </p>
             </div>
-            <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-semibold">JD</div>
+            <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-semibold">
+              {displayName.charAt(0).toUpperCase()}
+            </div>
           </div>
 
           <div className="flex items-center gap-2 bg-secondary rounded-2xl px-4 py-3 mb-5">
@@ -84,20 +82,6 @@ const HomePage = () => {
             </div>
           </div>
 
-          <div className="mb-5">
-            <p className="font-semibold text-sm mb-3">Invest by Category</p>
-            <div className="grid grid-cols-4 gap-3">
-              {categories.map((c) => (
-                <div key={c.label} className="flex flex-col items-center gap-1.5 cursor-pointer">
-                  <div className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center hover:bg-primary/10 transition-colors">
-                    <c.icon className="w-5 h-5 text-primary" />
-                  </div>
-                  <span className="text-[10px] text-muted-foreground">{c.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
           <div>
             <div className="flex items-center justify-between mb-3">
               <p className="font-semibold text-sm">Best Offers</p>
@@ -113,19 +97,6 @@ const HomePage = () => {
                 </div>
               ))}
             </div>
-          </div>
-
-          <div className="flex items-center justify-around mt-6 pt-4 border-t border-border">
-            {[
-              { icon: HomeIcon, label: "Home", active: true },
-              { icon: Sprout, label: "All Farms", active: false },
-              { icon: BarChart3, label: "Statistic", active: false },
-              { icon: User, label: "My Profile", active: false },
-            ].map((n) => (
-              <div key={n.label} className={`flex flex-col items-center gap-1 text-[10px] cursor-pointer ${n.active ? "text-primary font-semibold" : "text-muted-foreground"}`}>
-                <n.icon className="w-5 h-5" /> {n.label}
-              </div>
-            ))}
           </div>
         </div>
 
