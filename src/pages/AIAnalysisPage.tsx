@@ -2,12 +2,12 @@ import { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useCrops } from "@/hooks/useCrops";
 import { useCropAnalysis } from "@/hooks/useCropAnalysis";
-import { useStorage } from "@/hooks/useStorage";
+import { useStorageBins } from "@/hooks/useStorage";
 import { Brain, Loader2, Sprout, Warehouse, AlertTriangle, TrendingUp, Droplets, Sun, Bug, Leaf } from "lucide-react";
 
 const AIAnalysisPage = () => {
   const { data: crops } = useCrops();
-  const { data: bins } = useStorage();
+  const { data: bins } = useStorageBins();
   const { analysis, loading, analyze } = useCropAnalysis();
   const [selectedCropId, setSelectedCropId] = useState<string | null>(null);
 
