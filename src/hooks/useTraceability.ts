@@ -1,13 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
 export type TraceabilityBatch = {
   id: string;
   product_name: string;
   batch_code: string;
+  user_id: string | null;
   created_at: string;
-  steps: TraceabilityStep[];
+  traceability_steps: TraceabilityStep[];
 };
 
 export type TraceabilityStep = {
@@ -20,26 +22,28 @@ export type TraceabilityStep = {
   sort_order: number;
 };
 
-export const useTraceabilityBatches = () =>
-  useQuery({
-    queryKey: ["traceability"],
+export const useTraceabilityBatches = () => {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["traceability", user?.id],
     queryFn: async () => {
-      const { data: batches, error: bErr } = await supabase.from("traceability_batches").select("*").order("created_at", { ascending: false });
-      if (bErr) throw bErr;
-      const { data: steps, error: sErr } = await supabase.from("traceability_steps").select("*").order("sort_order");
-      if (sErr) throw sErr;
-      return (batches as any[]).map(b => ({
-        ...b,
-        steps: (steps as any[]).filter(s => s.batch_id === b.id),
-      })) as TraceabilityBatch[];
+      const { data, error } = await supabase
+        .from("traceability_batches")
+        .select("*, traceability_steps(*)")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as TraceabilityBatch[];
     },
+    enabled: !!user,
   });
+};
 
 export const useAddBatch = () => {
   const qc = useQueryClient();
+  const { user } = useAuth();
   return useMutation({
     mutationFn: async (batch: { product_name: string; batch_code: string }) => {
-      const { data, error } = await supabase.from("traceability_batches").insert(batch).select().single();
+      const { data, error } = await supabase.from("traceability_batches").insert({ ...batch, user_id: user!.id }).select().single();
       if (error) throw error;
       return data;
     },

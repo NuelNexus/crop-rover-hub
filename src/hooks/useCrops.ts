@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
 export type Crop = {
@@ -14,25 +15,30 @@ export type Crop = {
   yield_amount: number | null;
   yield_unit: string | null;
   notes: string | null;
+  user_id: string | null;
   created_at: string;
   updated_at: string;
 };
 
-export const useCrops = () =>
-  useQuery({
-    queryKey: ["crops"],
+export const useCrops = () => {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["crops", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase.from("crops").select("*").order("created_at", { ascending: false });
       if (error) throw error;
       return data as Crop[];
     },
+    enabled: !!user,
   });
+};
 
 export const useAddCrop = () => {
   const qc = useQueryClient();
+  const { user } = useAuth();
   return useMutation({
-    mutationFn: async (crop: Omit<Crop, "id" | "created_at" | "updated_at">) => {
-      const { data, error } = await supabase.from("crops").insert(crop).select().single();
+    mutationFn: async (crop: Omit<Crop, "id" | "created_at" | "updated_at" | "user_id">) => {
+      const { data, error } = await supabase.from("crops").insert({ ...crop, user_id: user!.id }).select().single();
       if (error) throw error;
       return data;
     },
