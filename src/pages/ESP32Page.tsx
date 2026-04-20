@@ -78,6 +78,7 @@ const ESP32Page = () => {
               <select value={form.device_type} onChange={(e) => setForm({ ...form, device_type: e.target.value })} className="px-3 py-2 rounded-xl border border-border bg-background text-sm">
                 <option value="crop_rover">CropRover Bot</option>
                 <option value="storage_unit">Storage Unit</option>
+                <option value="esp32_cam">ESP32-CAM (Vision)</option>
               </select>
               <input value={form.ip_address} onChange={(e) => setForm({ ...form, ip_address: e.target.value })} placeholder="IP address (optional)" className="px-3 py-2 rounded-xl border border-border bg-background text-sm" />
             </div>
