@@ -1,7 +1,7 @@
 import { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useDevices, useAddDevice, useDeleteDevice, useSensorReadings, useRealtimeSensorReadings, generateESP32Code } from "@/hooks/useESP32";
-import { Cpu, Plus, Trash2, Copy, Wifi, WifiOff, X, Code, RefreshCw } from "lucide-react";
+import { Cpu, Plus, Trash2, Copy, Wifi, WifiOff, X, Code, RefreshCw, Download } from "lucide-react";
 import { toast } from "sonner";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { format } from "date-fns";
@@ -27,14 +27,26 @@ const ESP32Page = () => {
     setShowAdd(false);
   };
 
+  const buildCode = (device: any) =>
+    generateESP32Code(device, import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
+
   const copyCode = (device: any) => {
-    const code = generateESP32Code(
-      device,
-      import.meta.env.VITE_SUPABASE_URL,
-      import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
-    );
-    navigator.clipboard.writeText(code);
+    navigator.clipboard.writeText(buildCode(device));
     toast.success("ESP32 code copied to clipboard!");
+  };
+
+  const downloadCode = (device: any) => {
+    const blob = new Blob([buildCode(device)], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const safeName = device.device_name.replace(/[^a-z0-9_-]+/gi, "_");
+    a.href = url;
+    a.download = `${safeName}_${device.device_type}.ino`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Arduino sketch downloaded!");
   };
 
   // Group readings by sensor_type for charting
@@ -113,12 +125,18 @@ const ESP32Page = () => {
                   </span>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={(e) => { e.stopPropagation(); downloadCode(device); }}
+                  className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+                >
+                  <Download className="w-3 h-3" /> Download .ino
+                </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); copyCode(device); }}
-                  className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-medium bg-secondary hover:bg-secondary/80 transition-colors"
+                  className="flex items-center justify-center gap-1 py-2 px-3 rounded-xl text-xs font-medium bg-secondary hover:bg-secondary/80 transition-colors"
                 >
-                  <Copy className="w-3 h-3" /> Copy Arduino Code
+                  <Copy className="w-3 h-3" /> Copy
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); setShowCode(showCode === device.id ? null : device.id); }}
