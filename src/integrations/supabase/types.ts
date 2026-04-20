@@ -92,6 +92,50 @@ export type Database = {
         }
         Relationships: []
       }
+      esp32_camera_captures: {
+        Row: {
+          ai_analysis: string | null
+          analyzed: boolean
+          created_at: string
+          detected_issue: string | null
+          device_id: string
+          id: string
+          image_url: string
+          location: string | null
+          severity: string
+        }
+        Insert: {
+          ai_analysis?: string | null
+          analyzed?: boolean
+          created_at?: string
+          detected_issue?: string | null
+          device_id: string
+          id?: string
+          image_url: string
+          location?: string | null
+          severity?: string
+        }
+        Update: {
+          ai_analysis?: string | null
+          analyzed?: boolean
+          created_at?: string
+          detected_issue?: string | null
+          device_id?: string
+          id?: string
+          image_url?: string
+          location?: string | null
+          severity?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "esp32_camera_captures_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "esp32_devices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       esp32_devices: {
         Row: {
           api_key: string

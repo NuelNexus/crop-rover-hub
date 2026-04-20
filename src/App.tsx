@@ -20,6 +20,7 @@ import WeatherPage from "./pages/WeatherPage";
 import SettingsPage from "./pages/SettingsPage";
 import AIAnalysisPage from "./pages/AIAnalysisPage";
 import ESP32Page from "./pages/ESP32Page";
+import CameraFeedPage from "./pages/CameraFeedPage";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +55,7 @@ const AppRoutes = () => (
     <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
     <Route path="/ai-analysis" element={<ProtectedRoute><AIAnalysisPage /></ProtectedRoute>} />
     <Route path="/esp32" element={<ProtectedRoute><ESP32Page /></ProtectedRoute>} />
+    <Route path="/camera-feed" element={<ProtectedRoute><CameraFeedPage /></ProtectedRoute>} />
     <Route path="*" element={<NotFound />} />
   </Routes>
 );
