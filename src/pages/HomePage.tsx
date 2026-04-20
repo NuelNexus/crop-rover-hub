@@ -1,25 +1,39 @@
 import { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
-import { Search, CloudSun, Plus, Star, ShoppingCart, ChevronDown, Sun } from "lucide-react";
+import { Plus, Sprout, Package, AlertTriangle, TrendingUp, StickyNote } from "lucide-react";
 import { useNotes, useAddNote } from "@/hooks/useNotes";
-import { useProducts } from "@/hooks/useMarketplace";
+import { useCrops } from "@/hooks/useCrops";
+import { useStorageBins } from "@/hooks/useStorage";
+import { useAlerts } from "@/hooks/useAlerts";
+import { useDevices, useSensorReadings } from "@/hooks/useESP32";
 import { useAuth } from "@/contexts/AuthContext";
-import { toast } from "sonner";
-import plantImg from "@/assets/plant-monstera.png";
-import farmImg from "@/assets/farm-landscape.jpg";
 import { formatDistanceToNow } from "date-fns";
+import { Link } from "react-router-dom";
 
 const HomePage = () => {
   const { user } = useAuth();
-  const { data: notes, isLoading: notesLoading } = useNotes();
-  const { data: products } = useProducts();
+  const { data: notes } = useNotes();
+  const { data: crops } = useCrops();
+  const { data: bins } = useStorageBins();
+  const { data: alerts } = useAlerts();
+  const { data: devices } = useDevices();
+  const firstDevice = devices?.[0];
+  const { data: readings } = useSensorReadings(firstDevice?.id);
   const addNote = useAddNote();
   const [newNote, setNewNote] = useState("");
-  const [qty, setQty] = useState(1);
-  const [searchQuery, setSearchQuery] = useState("");
 
-  const firstProduct = products?.[0];
   const displayName = user?.user_metadata?.display_name || user?.email?.split("@")[0] || "Farmer";
+
+  const totalCrops = crops?.length || 0;
+  const avgProgress = crops?.length ? Math.round(crops.reduce((s, c) => s + (c.progress || 0), 0) / crops.length) : 0;
+  const totalBins = bins?.length || 0;
+  const avgFill = bins?.length ? Math.round(bins.reduce((s, b) => s + (b.fill_percentage || 0), 0) / bins.length) : 0;
+  const unreadAlerts = alerts?.filter((a) => !a.is_read).length || 0;
+  const onlineDevices = devices?.filter((d) => d.is_online).length || 0;
+
+  // Latest reading per sensor type from first device
+  const sensorTypes = [...new Set(readings?.map((r) => r.sensor_type) || [])];
+  const latestReadings = sensorTypes.map((t) => readings?.find((r) => r.sensor_type === t)).filter(Boolean).slice(0, 4);
 
   const handleAddNote = () => {
     if (!newNote.trim()) return;
@@ -27,195 +41,158 @@ const HomePage = () => {
     setNewNote("");
   };
 
-  const addToCart = () => {
-    toast.success(`Added ${qty} item(s) to cart`);
-  };
+  const stats = [
+    { label: "Active Crops", value: totalCrops, sub: `${avgProgress}% avg progress`, icon: Sprout, color: "text-success", to: "/crops" },
+    { label: "Storage Bins", value: totalBins, sub: `${avgFill}% avg fill`, icon: Package, color: "text-primary", to: "/storage" },
+    { label: "Open Alerts", value: unreadAlerts, sub: `${alerts?.length || 0} total`, icon: AlertTriangle, color: "text-warning", to: "/" },
+    { label: "Devices Online", value: `${onlineDevices}/${devices?.length || 0}`, sub: "ESP32 sensors", icon: TrendingUp, color: "text-primary", to: "/esp32" },
+  ];
 
   return (
     <AppLayout>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Panel */}
-        <div className="bg-card rounded-3xl p-6 shadow-sm border border-border flex flex-col">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <p className="text-muted-foreground text-sm">Hello, {displayName}</p>
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                {new Date().toLocaleDateString("en-US", { weekday: "long", day: "2-digit", month: "short", year: "numeric" })} <ChevronDown className="w-3 h-3" />
-              </p>
-            </div>
-            <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-semibold">
-              {displayName.charAt(0).toUpperCase()}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 bg-secondary rounded-2xl px-4 py-3 mb-5">
-            <Search className="w-4 h-4 text-muted-foreground" />
-            <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search here..." className="bg-transparent outline-none text-sm w-full placeholder:text-muted-foreground" />
-          </div>
-
-          <div className="bg-card rounded-2xl p-5 border border-border shadow-sm mb-5">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-semibold">Farm Location</p>
-              <CloudSun className="w-8 h-8 text-warning" />
-            </div>
-            <div className="flex items-baseline gap-1 mb-1">
-              <span className="font-display text-4xl font-bold">29</span>
-              <span className="text-lg">°C</span>
-              <span className="text-xs text-muted-foreground ml-2">H: 32°C</span>
-            </div>
-            <p className="text-xs text-muted-foreground mb-3">L: 18°C</p>
-            <div className="grid grid-cols-4 gap-2 text-center text-xs text-muted-foreground mb-3">
-              <div><p className="font-medium text-foreground">Humidity</p><p>65%</p></div>
-              <div><p className="font-medium text-foreground">Precipitation</p><p>2.1ml</p></div>
-              <div><p className="font-medium text-foreground">Pressure</p><p>1013 hPa</p></div>
-              <div><p className="font-medium text-foreground">Wind</p><p>12 km/h</p></div>
-            </div>
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>5:45 am</span>
-              <div className="flex-1 mx-3 h-0.5 bg-gradient-to-r from-warning/30 via-warning to-warning/30 rounded-full relative">
-                <Sun className="w-4 h-4 text-warning absolute left-1/2 -translate-x-1/2 -top-1.5" />
-              </div>
-              <span>7:30 pm</span>
-            </div>
-            <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-0.5">
-              <span>Sunrise</span><span>Sunset</span>
-            </div>
-          </div>
-
+      <div className="space-y-6">
+        {/* Greeting */}
+        <div className="flex items-center justify-between">
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <p className="font-semibold text-sm">Best Offers</p>
-              <span className="text-xs text-primary font-medium cursor-pointer">View all</span>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {(products || []).slice(0, 4).map((p) => (
-                <div key={p.id} className="rounded-xl overflow-hidden relative group cursor-pointer">
-                  <img src={farmImg} alt={p.name} className="w-full h-20 object-cover rounded-xl" loading="lazy" />
-                  <div className="absolute inset-0 bg-foreground/30 flex items-end p-2 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span className="text-xs text-white font-medium">{p.name}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Middle Panel – Farm Details */}
-        <div className="bg-card rounded-3xl p-6 shadow-sm border border-border flex flex-col">
-          <p className="font-display text-lg font-semibold text-center mb-4">Farm Details</p>
-          <div className="flex justify-center mb-4">
-            <div className="w-48 h-48 rounded-full border-2 border-primary/20 flex items-center justify-center">
-              <img src={plantImg} alt="Lime Seedlings" className="w-40 h-40 object-contain" />
-            </div>
-          </div>
-
-          <div className="flex justify-center gap-2 mb-5">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className={`w-10 h-10 rounded-full overflow-hidden border-2 ${i === 0 ? "border-primary" : "border-border"}`}>
-                <img src={farmImg} alt="" className="w-full h-full object-cover" loading="lazy" />
-              </div>
-            ))}
-          </div>
-
-          <div className="mb-4">
-            <h3 className="font-display text-xl font-bold">{firstProduct?.name || "Lime Seedlings"}</h3>
-            <div className="flex items-center justify-between mt-1">
-              <span className="text-xs text-success font-medium">{firstProduct?.stock_status || "Available in stock"}</span>
-              <span className="font-display text-lg font-bold">${firstProduct?.price || 30}<span className="text-xs font-normal text-muted-foreground">/{firstProduct?.price_unit || "pcs"}</span></span>
-            </div>
-            <div className="flex items-center justify-between mt-2">
-              <div className="flex items-center gap-1 text-xs">
-                <Star className="w-3 h-3 text-warning fill-warning" />
-                <span className="font-medium">{firstProduct?.rating || 4.9}</span>
-                <span className="text-muted-foreground">(192)</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <button onClick={() => setQty(Math.max(1, qty - 1))} className="w-7 h-7 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:bg-secondary">−</button>
-                <span className="font-medium">{qty}pcs</span>
-                <button onClick={() => setQty(qty + 1)} className="w-7 h-7 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:bg-secondary">+</button>
-              </div>
-            </div>
-          </div>
-
-          <div className="mb-4">
-            <h4 className="font-semibold text-sm mb-1">Description</h4>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              {firstProduct?.description || "Premium quality seedlings ready for transplanting. Organic and sustainably grown."}
+            <h1 className="font-display text-2xl font-bold">Hello, {displayName} 👋</h1>
+            <p className="text-sm text-muted-foreground">
+              {new Date().toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
             </p>
           </div>
-
-          <div className="mb-5">
-            <h4 className="font-semibold text-sm mb-2">Related Products</h4>
-            <div className="flex gap-2 overflow-x-auto">
-              {(products || []).slice(1, 7).map((p) => (
-                <div key={p.id} className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 border border-border cursor-pointer hover:border-primary transition-colors">
-                  <img src={farmImg} alt={p.name} className="w-full h-full object-cover" loading="lazy" />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <button onClick={addToCart} className="w-full bg-primary text-primary-foreground py-3.5 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity mt-auto">
-            <ShoppingCart className="w-4 h-4" /> Add To Cart
-          </button>
         </div>
 
-        {/* Right Panel – Notes */}
-        <div className="bg-card rounded-3xl p-6 shadow-sm border border-border flex flex-col">
-          <p className="font-display text-lg font-semibold text-center mb-4">Todays Weather</p>
+        {/* Stat cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {stats.map((s) => (
+            <Link key={s.label} to={s.to} className="bg-card rounded-2xl p-5 border border-border shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs text-muted-foreground">{s.label}</p>
+                <s.icon className={`w-5 h-5 ${s.color}`} />
+              </div>
+              <p className="font-display text-3xl font-bold">{s.value}</p>
+              <p className="text-xs text-muted-foreground mt-1">{s.sub}</p>
+            </Link>
+          ))}
+        </div>
 
-          <div className="bg-secondary rounded-2xl p-5 mb-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">{new Date().toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}</p>
-                <p className="font-display text-5xl font-bold mt-1">29<span className="text-xl align-top">°C</span></p>
-                <p className="text-xs text-muted-foreground mt-1">Humidity 65%</p>
-              </div>
-              <div className="text-right">
-                <CloudSun className="w-12 h-12 text-warning mb-1" />
-                <p className="text-xs font-medium">Partly Cloudy</p>
-              </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* My Crops */}
+          <div className="bg-card rounded-2xl p-6 border border-border shadow-sm lg:col-span-2">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-display text-lg font-semibold">My Crops</h2>
+              <Link to="/crops" className="text-xs text-primary font-medium">View all</Link>
             </div>
-            <p className="text-xs text-primary mt-3 font-medium">Today is a good day to apply pesticides. Low wind speed detected.</p>
+            {(!crops || crops.length === 0) ? (
+              <div className="text-center py-10 text-muted-foreground">
+                <Sprout className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                <p className="text-sm">No crops yet</p>
+                <Link to="/crops" className="text-xs text-primary font-medium">Add your first crop</Link>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {crops.slice(0, 5).map((c) => (
+                  <div key={c.id} className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center">
+                      <Sprout className="w-5 h-5 text-success" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium truncate">{c.name}</p>
+                        <span className="text-xs text-muted-foreground">{c.progress}%</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
+                          <div className="h-full bg-success rounded-full" style={{ width: `${c.progress}%` }} />
+                        </div>
+                        <span className="text-[10px] text-muted-foreground capitalize">{c.stage}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div className="flex-1">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-sm">Notes</h3>
+          {/* Live sensors */}
+          <div className="bg-card rounded-2xl p-6 border border-border shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-display text-lg font-semibold">Live Sensors</h2>
+              <Link to="/esp32" className="text-xs text-primary font-medium">Manage</Link>
             </div>
-            <div className="space-y-3 max-h-48 overflow-y-auto">
-              {notesLoading ? (
-                <div className="animate-pulse h-20" />
-              ) : (notes || []).map((n) => (
-                <div key={n.id} className="flex items-start gap-3 py-3 border-b border-border last:border-0">
-                  <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border border-border">
-                    <img src={farmImg} alt="" className="w-full h-full object-cover" loading="lazy" />
+            {!firstDevice ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p className="text-sm">No devices connected</p>
+                <Link to="/esp32" className="text-xs text-primary font-medium">Add ESP32</Link>
+              </div>
+            ) : latestReadings.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Waiting for readings…</p>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">{firstDevice.device_name}</p>
+                {latestReadings.map((r: any) => (
+                  <div key={r.id} className="flex items-center justify-between bg-secondary/50 rounded-xl p-3">
+                    <span className="text-xs capitalize text-muted-foreground">{r.sensor_type.replace("_", " ")}</span>
+                    <span className="font-display font-bold">{r.value.toFixed(1)}<span className="text-xs ml-1 text-muted-foreground">{r.unit}</span></span>
                   </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}</p>
-                    <p className="text-xs mt-0.5 leading-relaxed">{n.text}</p>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Alerts */}
+          <div className="bg-card rounded-2xl p-6 border border-border shadow-sm">
+            <h2 className="font-display text-lg font-semibold mb-4">Recent Alerts</h2>
+            {(!alerts || alerts.length === 0) ? (
+              <p className="text-sm text-muted-foreground text-center py-6">No alerts. All systems healthy.</p>
+            ) : (
+              <div className="space-y-2">
+                {alerts.slice(0, 4).map((a) => (
+                  <div key={a.id} className="flex items-start gap-3 p-3 rounded-xl bg-secondary/50">
+                    <AlertTriangle className={`w-4 h-4 mt-0.5 ${a.severity === "high" ? "text-destructive" : a.severity === "medium" ? "text-warning" : "text-muted-foreground"}`} />
+                    <div className="flex-1">
+                      <p className="text-sm">{a.message}</p>
+                      <p className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(a.created_at), { addSuffix: true })}</p>
+                    </div>
                   </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Notes */}
+          <div className="bg-card rounded-2xl p-6 border border-border shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <StickyNote className="w-5 h-5 text-warning" />
+              <h2 className="font-display text-lg font-semibold">Farm Notes</h2>
+            </div>
+            <div className="space-y-2 max-h-40 overflow-y-auto mb-3">
+              {(!notes || notes.length === 0) ? (
+                <p className="text-xs text-muted-foreground text-center py-4">No notes yet</p>
+              ) : notes.slice(0, 4).map((n) => (
+                <div key={n.id} className="p-3 rounded-xl bg-secondary/50">
+                  <p className="text-sm">{n.text}</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">{formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}</p>
                 </div>
               ))}
-              {!notesLoading && (!notes || notes.length === 0) && <p className="text-xs text-muted-foreground text-center py-4">No notes yet</p>}
             </div>
-          </div>
-
-          <div className="mt-4 space-y-2">
-            <textarea
-              value={newNote}
-              onChange={e => setNewNote(e.target.value)}
-              placeholder="Write a note..."
-              rows={2}
-              className="w-full px-4 py-3 rounded-2xl border border-border bg-background text-sm resize-none placeholder:text-muted-foreground"
-            />
-            <button
-              onClick={handleAddNote}
-              disabled={addNote.isPending || !newNote.trim()}
-              className="w-full bg-primary text-primary-foreground py-3.5 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-              <Plus className="w-4 h-4" /> {addNote.isPending ? "Adding..." : "Add New Note"}
-            </button>
+            <div className="flex gap-2">
+              <input
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAddNote()}
+                placeholder="Quick note…"
+                className="flex-1 px-4 py-2.5 rounded-xl border border-border bg-background text-sm"
+              />
+              <button
+                onClick={handleAddNote}
+                disabled={addNote.isPending || !newNote.trim()}
+                className="bg-primary text-primary-foreground px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
