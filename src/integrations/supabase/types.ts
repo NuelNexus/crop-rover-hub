@@ -525,7 +525,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      device_heartbeat: {
+        Args: { _device_id: string; _ip?: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
