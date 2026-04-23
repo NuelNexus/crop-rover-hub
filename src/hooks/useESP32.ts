@@ -166,6 +166,24 @@ const char* fieldLabel  = "Field A - Section 1";
 #define HREF_GPIO_NUM 23
 #define PCLK_GPIO_NUM 22
 
+void sendHeartbeat() {
+  if (WiFi.status() != WL_CONNECTED) return;
+  HTTPClient http;
+  String url = String(supabaseUrl) + "/rest/v1/esp32_devices?id=eq." + String(deviceId);
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("apikey", supabaseKey);
+  http.addHeader("Authorization", String("Bearer ") + supabaseKey);
+  http.addHeader("Prefer", "return=minimal");
+  String ip = WiFi.localIP().toString();
+  String body = String("{\\"is_online\\":true,\\"last_seen\\":\\"") + "now()" + "\\",\\"ip_address\\":\\"" + ip + "\\"}";
+  // Use Postgres now() via a JSON payload — send ISO time instead for safety:
+  body = String("{\\"is_online\\":true,\\"ip_address\\":\\"") + ip + "\\"}";
+  int code = http.sendRequest("PATCH", body);
+  Serial.printf("Heartbeat: %d\\n", code);
+  http.end();
+}
+
 bool initCamera() {
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
