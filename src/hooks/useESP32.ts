@@ -126,19 +126,34 @@ export const useRealtimeSensorReadings = (deviceId?: string) => {
 
 // ESP32 Arduino code generator — supports crop_rover, storage_unit, and esp32_cam
 export const generateESP32Code = (device: ESP32Device, supabaseUrl: string, supabaseAnonKey: string) => {
+  const heartbeatFn = `
+void sendHeartbeat() {
+  if (WiFi.status() != WL_CONNECTED) return;
+  HTTPClient http;
+  String url = String(supabaseUrl) + "/rest/v1/rpc/device_heartbeat";
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("apikey", supabaseKey);
+  http.addHeader("Authorization", String("Bearer ") + supabaseKey);
+  String ip = WiFi.localIP().toString();
+  String body = String("{\\"_device_id\\":\\"") + deviceId + "\\",\\"_ip\\":\\"" + ip + "\\"}";
+  int code = http.POST(body);
+  Serial.printf("Heartbeat: %d\\n", code);
+  http.end();
+}`;
+
   if (device.device_type === "esp32_cam") {
     return `
 // ============================================
 // ESP32-CAM Code for: ${device.device_name}
-// Captures images and uploads to agriCultur for
-// AI pest/disease detection via Gemini Vision.
-// Board: AI-Thinker ESP32-CAM
+// Board: AI-Thinker ESP32-CAM (with baseboard)
+// In Arduino IDE: Tools > Board > "AI Thinker ESP32-CAM"
+//                 Tools > Partition Scheme > "Huge APP (3MB No OTA/1MB SPIFFS)"
 // ============================================
 
 #include "esp_camera.h"
 #include <WiFi.h>
 #include <HTTPClient.h>
-#include <ArduinoJson.h>
 
 const char* ssid     = "YOUR_WIFI_SSID";
 const char* password = "YOUR_WIFI_PASSWORD";
@@ -165,24 +180,7 @@ const char* fieldLabel  = "Field A - Section 1";
 #define VSYNC_GPIO_NUM 25
 #define HREF_GPIO_NUM 23
 #define PCLK_GPIO_NUM 22
-
-void sendHeartbeat() {
-  if (WiFi.status() != WL_CONNECTED) return;
-  HTTPClient http;
-  String url = String(supabaseUrl) + "/rest/v1/esp32_devices?id=eq." + String(deviceId);
-  http.begin(url);
-  http.addHeader("Content-Type", "application/json");
-  http.addHeader("apikey", supabaseKey);
-  http.addHeader("Authorization", String("Bearer ") + supabaseKey);
-  http.addHeader("Prefer", "return=minimal");
-  String ip = WiFi.localIP().toString();
-  String body = String("{\\"is_online\\":true,\\"last_seen\\":\\"") + "now()" + "\\",\\"ip_address\\":\\"" + ip + "\\"}";
-  // Use Postgres now() via a JSON payload — send ISO time instead for safety:
-  body = String("{\\"is_online\\":true,\\"ip_address\\":\\"") + ip + "\\"}";
-  int code = http.sendRequest("PATCH", body);
-  Serial.printf("Heartbeat: %d\\n", code);
-  http.end();
-}
+${heartbeatFn}
 
 bool initCamera() {
   camera_config_t config;
@@ -228,48 +226,45 @@ void uploadImage(camera_fb_t* fb) {
   http2.addHeader("Authorization", String("Bearer ") + supabaseKey);
   http2.addHeader("Prefer", "return=representation");
 
-  StaticJsonDocument<512> doc;
-  doc["device_id"] = deviceId;
-  doc["image_url"] = publicUrl;
-  doc["location"] = fieldLabel;
-  String body; serializeJson(doc, body);
+  String body = String("{\\"device_id\\":\\"") + deviceId +
+                "\\",\\"image_url\\":\\"" + publicUrl +
+                "\\",\\"location\\":\\"" + fieldLabel + "\\"}";
   int c2 = http2.POST(body);
   String resp = http2.getString();
   Serial.printf("Capture row: %d\\n", c2);
-
-  String captureId = "";
-  StaticJsonDocument<1024> rdoc;
-  if (deserializeJson(rdoc, resp) == DeserializationError::Ok && rdoc.is<JsonArray>()) {
-    captureId = String((const char*) rdoc[0]["id"]);
-  }
   http2.end();
 
-  if (captureId.length() > 0) {
-    HTTPClient http3;
-    String fnUrl = String(supabaseUrl) + "/functions/v1/analyze-cam-image";
-    http3.begin(fnUrl);
-    http3.addHeader("Content-Type", "application/json");
-    http3.addHeader("Authorization", String("Bearer ") + supabaseKey);
-    StaticJsonDocument<512> fdoc;
-    fdoc["image_url"] = publicUrl;
-    fdoc["capture_id"] = captureId;
-    String fbody; serializeJson(fdoc, fbody);
-    int c3 = http3.POST(fbody);
-    Serial.printf("AI analysis: %d\\n", c3);
-    http3.end();
-  }
+  // Trigger AI analysis (best-effort)
+  HTTPClient http3;
+  String fnUrl = String(supabaseUrl) + "/functions/v1/analyze-cam-image";
+  http3.begin(fnUrl);
+  http3.addHeader("Content-Type", "application/json");
+  http3.addHeader("Authorization", String("Bearer ") + supabaseKey);
+  String fbody = String("{\\"image_url\\":\\"") + publicUrl + "\\"}";
+  int c3 = http3.POST(fbody);
+  Serial.printf("AI analysis: %d\\n", c3);
+  http3.end();
 }
 
 void setup() {
   Serial.begin(115200);
-  if (!initCamera()) { Serial.println("Camera init failed"); return; }
+  Serial.setDebugOutput(true);
   WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi");
   while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
-  Serial.println("\\nWiFi connected!");
+  Serial.println();
+  Serial.print("WiFi connected. IP: "); Serial.println(WiFi.localIP());
+  sendHeartbeat();
+  if (!initCamera()) { Serial.println("Camera init FAILED — check baseboard/ribbon cable"); }
 }
 
 void loop() {
-  if (WiFi.status() != WL_CONNECTED) { delay(2000); return; }
+  if (WiFi.status() != WL_CONNECTED) {
+    WiFi.reconnect();
+    delay(3000);
+    return;
+  }
+  sendHeartbeat();
   camera_fb_t* fb = esp_camera_fb_get();
   if (!fb) { Serial.println("Capture failed"); delay(2000); return; }
   uploadImage(fb);
@@ -288,7 +283,6 @@ void loop() {
 
 #include <WiFi.h>
 #include <HTTPClient.h>
-#include <ArduinoJson.h>
 
 const char* ssid = "YOUR_WIFI_SSID";
 const char* password = "YOUR_WIFI_PASSWORD";
@@ -298,18 +292,11 @@ const char* supabaseKey = "${supabaseAnonKey}";
 const char* deviceId = "${device.id}";
 
 ${device.device_type === "crop_rover" ? `#define SOIL_MOISTURE_PIN 34
-#define DHT_PIN 4
 #define LIGHT_SENSOR_PIN 35
 #define PH_SENSOR_PIN 32` : `#define TEMP_SENSOR_PIN 34
 #define HUMIDITY_SENSOR_PIN 35
 #define WEIGHT_SENSOR_PIN 32`}
-
-void setup() {
-  Serial.begin(115200);
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) { delay(1000); Serial.println("Connecting..."); }
-  Serial.println("Connected!");
-}
+${heartbeatFn}
 
 void sendReading(const char* sensorType, float value, const char* unit) {
   if (WiFi.status() != WL_CONNECTED) return;
@@ -320,18 +307,26 @@ void sendReading(const char* sensorType, float value, const char* unit) {
   http.addHeader("apikey", supabaseKey);
   http.addHeader("Authorization", String("Bearer ") + supabaseKey);
   http.addHeader("Prefer", "return=minimal");
-  StaticJsonDocument<256> doc;
-  doc["device_id"] = deviceId;
-  doc["sensor_type"] = sensorType;
-  doc["value"] = value;
-  doc["unit"] = unit;
-  String body; serializeJson(doc, body);
+  String body = String("{\\"device_id\\":\\"") + deviceId +
+                "\\",\\"sensor_type\\":\\"" + sensorType +
+                "\\",\\"value\\":" + String(value, 2) +
+                ",\\"unit\\":\\"" + unit + "\\"}";
   int code = http.POST(body);
   Serial.printf("Sent %s: %.2f %s (HTTP %d)\\n", sensorType, value, unit, code);
   http.end();
 }
 
+void setup() {
+  Serial.begin(115200);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) { delay(1000); Serial.println("Connecting..."); }
+  Serial.print("Connected! IP: "); Serial.println(WiFi.localIP());
+  sendHeartbeat();
+}
+
 void loop() {
+  if (WiFi.status() != WL_CONNECTED) { WiFi.reconnect(); delay(3000); return; }
+  sendHeartbeat();
 ${device.device_type === "crop_rover" ? `  float soilMoisture = analogRead(SOIL_MOISTURE_PIN) / 40.95;
   float lightIntensity = analogRead(LIGHT_SENSOR_PIN) / 4.095;
   float soilPH = (analogRead(PH_SENSOR_PIN) / 4095.0) * 14.0;
