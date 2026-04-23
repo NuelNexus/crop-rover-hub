@@ -118,12 +118,18 @@ const ESP32Page = () => {
                     <p className="text-xs text-muted-foreground capitalize">{device.device_type.replace("_", " ")}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  {device.is_online ? <Wifi className="w-4 h-4 text-success" /> : <WifiOff className="w-4 h-4 text-muted-foreground" />}
-                  <span className={`text-xs ${device.is_online ? "text-success" : "text-muted-foreground"}`}>
-                    {device.is_online ? "Online" : "Offline"}
-                  </span>
-                </div>
+                {(() => {
+                  const fresh = device.last_seen && (Date.now() - new Date(device.last_seen).getTime() < 2 * 60 * 1000);
+                  const online = device.is_online || fresh;
+                  return (
+                    <div className="flex items-center gap-1">
+                      {online ? <Wifi className="w-4 h-4 text-success" /> : <WifiOff className="w-4 h-4 text-muted-foreground" />}
+                      <span className={`text-xs ${online ? "text-success" : "text-muted-foreground"}`}>
+                        {online ? "Online" : "Offline"}
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
               <div className="flex gap-2 flex-wrap">
                 <button
