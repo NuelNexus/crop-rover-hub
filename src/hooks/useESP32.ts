@@ -38,6 +38,7 @@ export const useDevices = () => {
       return data as ESP32Device[];
     },
     enabled: !!user,
+    refetchInterval: 5000,
   });
 };
 
