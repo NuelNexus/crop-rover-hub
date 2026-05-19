@@ -40,9 +40,9 @@ const AppSidebar = () => {
     <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground">
       <div className="px-6 py-6">
         <div className="flex items-center gap-2">
-          <img src="/logo.svg" alt="agriCultur logo" className="w-8 h-8" />
+          <img src="/logo.svg" alt="Harvest IQ logo" className="w-8 h-8" />
           <span className="font-display text-xl font-bold tracking-tight">
-            agri<span className="text-sidebar-primary">Cultur</span>
+            Harvest <span className="text-sidebar-primary">IQ</span>
           </span>
         </div>
         {user && (

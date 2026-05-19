@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { toast } from "sonner";
-import { Sprout, Mail, Lock, User, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 
 const AuthPage = () => {
   const navigate = useNavigate();
@@ -58,8 +58,8 @@ const AuthPage = () => {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-2 mb-2">
-            <Sprout className="w-8 h-8 text-primary" />
-            <span className="font-display text-2xl font-bold">agri<span className="text-primary">Cultur</span></span>
+            <img src="/logo.svg" alt="Harvest IQ logo" className="w-8 h-8" />
+            <span className="font-display text-2xl font-bold">Harvest <span className="text-primary">IQ</span></span>
           </div>
           <p className="text-sm text-muted-foreground">Smart farming, real-time insights</p>
         </div>
