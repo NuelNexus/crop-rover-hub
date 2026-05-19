@@ -1,5 +1,10 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
+const edgeCorsHeaders = {
+  ...corsHeaders,
+  'Access-Control-Allow-Headers': `${corsHeaders['Access-Control-Allow-Headers']}, x-device-id, x-device-key, x-location`,
+};
+
 type Device = {
   id: string;
   api_key: string;
@@ -14,7 +19,7 @@ type Reading = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...edgeCorsHeaders, 'Content-Type': 'application/json' },
   });
 
 const cleanText = (value: unknown, max = 120) =>
@@ -141,7 +146,7 @@ async function analyzeImage(imageUrl: string) {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: edgeCorsHeaders });
   if (req.method !== 'POST') return json({ error: 'POST required' }, 405);
 
   try {
