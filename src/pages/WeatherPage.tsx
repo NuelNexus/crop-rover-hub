@@ -23,6 +23,7 @@ import {
   windDirection,
   WeatherLocation,
 } from "@/hooks/useWeather";
+import WeatherScene, { codeToScene } from "@/components/weather/WeatherScene";
 import { toast } from "sonner";
 
 const WeatherIcon = ({ code, className = "w-6 h-6 text-warning" }: { code?: number; className?: string }) => {
