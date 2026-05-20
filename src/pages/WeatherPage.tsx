@@ -23,6 +23,7 @@ import {
   windDirection,
   WeatherLocation,
 } from "@/hooks/useWeather";
+import WeatherScene, { codeToScene } from "@/components/weather/WeatherScene";
 import { toast } from "sonner";
 
 const WeatherIcon = ({ code, className = "w-6 h-6 text-warning" }: { code?: number; className?: string }) => {
@@ -156,6 +157,12 @@ const WeatherPage = () => {
           </div>
         ) : (
           <>
+            <WeatherScene
+              kind={codeToScene(current.weather_code)}
+              label={weatherCodeLabel(current.weather_code)}
+              temp={current.temperature_2m}
+            />
+
             <div className="stat-card bg-gradient-to-br from-primary/5 to-chart-blue/5">
               <div className="flex items-center justify-between">
                 <div>
