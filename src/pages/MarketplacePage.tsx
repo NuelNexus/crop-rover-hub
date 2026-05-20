@@ -1,10 +1,25 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useProducts, useAddProduct, useDeleteProduct } from "@/hooks/useMarketplace";
 import { usePlaceOrder, useOrders } from "@/hooks/useOrders";
 import { useAuth } from "@/contexts/AuthContext";
-import { ShoppingCart, Package, Star, Plus, Trash2, X, CheckCircle } from "lucide-react";
+import { ShoppingCart, Package, Star, Plus, Trash2, X, CheckCircle, Sprout } from "lucide-react";
 import { toast } from "sonner";
+
+const TOP_TABS = ["All", "Featured", "In Stock", "Limited"] as const;
+type TopTab = (typeof TOP_TABS)[number];
+
+const CATEGORY_GROUPS: { title: string; items: string[] }[] = [
+  { title: "Categories", items: ["Produce", "Seeds", "Supplies", "Equipment"] },
+  { title: "Availability", items: ["In Stock", "Limited", "Out of Stock"] },
+];
+
+const colorFor = (name: string) => {
+  const palette = ["#76993E", "#4A5E23", "#D97706", "#0F766E", "#7C3AED", "#B91C1C", "#0369A1", "#9333EA"];
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return palette[h % palette.length];
+};
 
 const MarketplacePage = () => {
   const { user } = useAuth();
@@ -13,10 +28,30 @@ const MarketplacePage = () => {
   const addProduct = useAddProduct();
   const deleteProduct = useDeleteProduct();
   const placeOrder = usePlaceOrder();
+
   const [showAdd, setShowAdd] = useState(false);
   const [showOrders, setShowOrders] = useState(false);
+  const [showCart, setShowCart] = useState(false);
+  const [topTab, setTopTab] = useState<TopTab>("All");
+  const [filter, setFilter] = useState<string | null>(null);
+  const [details, setDetails] = useState<any | null>(null);
+
   const [cart, setCart] = useState<{ id: string; name: string; price: number; qty: number }[]>([]);
-  const [form, setForm] = useState({ name: "", price: "", price_unit: "ton", seller: "", stock_status: "In Stock", category: "Produce", description: "", rating: 0 });
+  const [form, setForm] = useState({
+    name: "", price: "", price_unit: "ton", seller: "", stock_status: "In Stock",
+    category: "Produce", description: "", rating: 0,
+  });
+
+  const filtered = useMemo(() => {
+    let list = products || [];
+    if (topTab === "Featured") list = list.filter((p) => (p.rating || 0) >= 4);
+    if (topTab === "In Stock") list = list.filter((p) => p.stock_status === "In Stock");
+    if (topTab === "Limited") list = list.filter((p) => p.stock_status === "Limited");
+    if (filter) {
+      list = list.filter((p) => p.category === filter || p.stock_status === filter);
+    }
+    return list;
+  }, [products, topTab, filter]);
 
   const handleAdd = () => {
     if (!form.name.trim() || !form.price || !form.seller.trim()) return;
@@ -27,17 +62,12 @@ const MarketplacePage = () => {
 
   const addToCart = (product: any) => {
     const existing = cart.find((c) => c.id === product.id);
-    if (existing) {
-      setCart(cart.map((c) => (c.id === product.id ? { ...c, qty: c.qty + 1 } : c)));
-    } else {
-      setCart([...cart, { id: product.id, name: product.name, price: product.price, qty: 1 }]);
-    }
+    if (existing) setCart(cart.map((c) => (c.id === product.id ? { ...c, qty: c.qty + 1 } : c)));
+    else setCart([...cart, { id: product.id, name: product.name, price: Number(product.price), qty: 1 }]);
     toast.success(`Added ${product.name} to cart`);
   };
 
-  const removeFromCart = (id: string) => {
-    setCart(cart.filter((c) => c.id !== id));
-  };
+  const removeFromCart = (id: string) => setCart(cart.filter((c) => c.id !== id));
 
   const checkout = () => {
     cart.forEach((item) => {
@@ -49,134 +79,312 @@ const MarketplacePage = () => {
       });
     });
     setCart([]);
+    setShowCart(false);
   };
 
   const cartTotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
-
-  if (isLoading) return <AppLayout><div className="animate-pulse h-96" /></AppLayout>;
+  const cartCount = cart.reduce((n, item) => n + item.qty, 0);
 
   return (
     <AppLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="font-display text-2xl font-bold">Marketplace</h1>
-          <div className="flex gap-2">
-            <button onClick={() => setShowOrders(!showOrders)} className="flex items-center gap-1 bg-secondary text-foreground px-3 py-2 rounded-xl text-sm font-medium hover:bg-secondary/80">
+      {/* Header strip */}
+      <div className="bg-card border border-border rounded-2xl mb-6 sticky top-2 z-20">
+        <div className="flex items-center gap-2 px-4 py-3 flex-wrap">
+          <Sprout className="w-7 h-7 text-primary" />
+          <span className="font-display text-2xl font-extrabold tracking-tight mr-4">Harvest Market</span>
+
+          <nav className="flex items-center gap-1 flex-wrap">
+            {TOP_TABS.map((t) => (
+              <button
+                key={t}
+                onClick={() => { setTopTab(t); setFilter(null); }}
+                className={`px-4 py-2 text-sm font-semibold uppercase tracking-wide rounded-md transition ${
+                  topTab === t ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </nav>
+
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => setShowOrders(true)}
+              className="flex items-center gap-1 px-3 py-2 rounded-xl text-sm font-medium hover:bg-secondary"
+            >
               <CheckCircle className="w-4 h-4" /> Orders ({orders?.length || 0})
             </button>
-            {cart.length > 0 && (
-              <div className="flex items-center gap-2">
-                <span className="flex items-center gap-1 bg-primary/10 text-primary px-3 py-2 rounded-xl text-sm font-medium">
-                  <ShoppingCart className="w-4 h-4" /> {cart.length} · ${cartTotal.toFixed(2)}
+            <button
+              onClick={() => setShowAdd(true)}
+              className="flex items-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-xl text-sm font-medium hover:opacity-90"
+            >
+              <Plus className="w-4 h-4" /> List
+            </button>
+            <button
+              onClick={() => setShowCart(true)}
+              className="relative p-2 rounded-full hover:bg-secondary"
+              aria-label="Open cart"
+            >
+              <ShoppingCart className="w-6 h-6" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                  {cartCount}
                 </span>
-                <button onClick={checkout} disabled={placeOrder.isPending} className="bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-medium hover:opacity-90">
-                  {placeOrder.isPending ? "Processing..." : "Checkout"}
-                </button>
-              </div>
-            )}
-            <button onClick={() => setShowAdd(!showAdd)} className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-medium hover:opacity-90">
-              <Plus className="w-4 h-4" /> List Product
+              )}
             </button>
           </div>
         </div>
+      </div>
 
-        {/* Cart */}
-        {cart.length > 0 && (
-          <div className="stat-card">
-            <h3 className="font-semibold mb-3">Shopping Cart</h3>
-            <div className="space-y-2">
-              {cart.map((item) => (
-                <div key={item.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                  <div>
-                    <p className="text-sm font-medium">{item.name}</p>
-                    <p className="text-xs text-muted-foreground">${item.price} × {item.qty} = ${(item.price * item.qty).toFixed(2)}</p>
-                  </div>
-                  <button onClick={() => removeFromCart(item.id)} className="text-destructive hover:bg-destructive/10 p-1 rounded"><X className="w-4 h-4" /></button>
-                </div>
+      <div className="flex gap-6">
+        {/* Sidebar */}
+        <aside className="hidden md:block w-48 shrink-0">
+          <div className="sticky top-24 space-y-6">
+            <button
+              onClick={() => setFilter(null)}
+              className={`block w-full text-left text-sm font-semibold px-2 py-1 rounded ${!filter ? "text-primary" : "hover:text-foreground text-muted-foreground"}`}
+            >
+              All products
+            </button>
+            {CATEGORY_GROUPS.map((g) => (
+              <div key={g.title}>
+                <p className="font-bold text-sm mb-2">{g.title}</p>
+                <ul className="space-y-1 pl-2 border-l border-border">
+                  {g.items.map((it) => (
+                    <li key={it}>
+                      <button
+                        onClick={() => setFilter(it)}
+                        className={`text-sm px-2 py-1 transition ${filter === it ? "text-primary font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+                      >
+                        {it}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </aside>
+
+        {/* Products */}
+        <section className="flex-1 min-w-0">
+          {isLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="rounded-2xl bg-secondary animate-pulse aspect-square" />
               ))}
             </div>
-          </div>
-        )}
-
-        {/* Orders */}
-        {showOrders && orders && orders.length > 0 && (
-          <div className="stat-card">
-            <h3 className="font-semibold mb-3">Your Orders</h3>
-            <div className="space-y-2">
-              {orders.map((order) => (
-                <div key={order.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                  <div>
-                    <p className="text-sm font-medium">{order.product_name}</p>
-                    <p className="text-xs text-muted-foreground">Qty: {order.quantity} · Total: ${order.total_price}</p>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-20 border-2 border-dashed border-border rounded-2xl">
+              <Package className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
+              <p className="text-muted-foreground">No products yet. Click <b>List</b> to add the first one.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {filtered.map((l) => {
+                const inBag = cart.some((c) => c.id === l.id);
+                const sale = (l.rating || 0) >= 4.5;
+                return (
+                  <div
+                    key={l.id}
+                    onClick={() => setDetails(l)}
+                    className="group cursor-pointer"
+                  >
+                    <div
+                      className="relative aspect-square rounded-2xl overflow-hidden flex items-center justify-center"
+                      style={{ background: `linear-gradient(135deg, ${colorFor(l.name)}22, ${colorFor(l.name)}55)` }}
+                    >
+                      {sale && (
+                        <span className="absolute top-3 left-3 bg-destructive text-destructive-foreground text-[10px] font-bold uppercase px-2 py-1 rounded-md tracking-wider">
+                          Featured
+                        </span>
+                      )}
+                      <span
+                        className="font-display text-6xl font-black opacity-80"
+                        style={{ color: colorFor(l.name) }}
+                      >
+                        {l.name.charAt(0).toUpperCase()}
+                      </span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); if (l.stock_status !== "Out of Stock") addToCart(l); }}
+                        disabled={l.stock_status === "Out of Stock"}
+                        className={`absolute bottom-3 right-3 w-10 h-10 rounded-full flex items-center justify-center shadow transition ${
+                          inBag ? "bg-foreground text-background" : "bg-background hover:bg-foreground hover:text-background"
+                        } disabled:opacity-40`}
+                      >
+                        <ShoppingCart className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="mt-3">
+                      <p className="text-sm">
+                        <span className="font-bold">{l.seller}</span> <span className="text-muted-foreground">· {l.name}</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground capitalize">{l.category}</p>
+                      <div className="flex items-center justify-between mt-1">
+                        <p className="font-bold">${Number(l.price).toFixed(2)}<span className="text-xs text-muted-foreground font-normal">/{l.price_unit}</span></p>
+                        <span className="flex items-center gap-1 text-xs"><Star className="w-3 h-3 text-warning fill-warning" /> {l.rating || "—"}</span>
+                      </div>
+                    </div>
                   </div>
-                  <span className={`text-xs px-2 py-1 rounded-full ${order.status === "pending" ? "bg-warning/10 text-warning" : "bg-success/10 text-success"}`}>
-                    {order.status}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
+
+      {/* Detail overlay */}
+      {details && (
+        <div className="fixed inset-0 z-50 bg-background animate-fade-in flex" onClick={() => setDetails(null)}>
+          <button className="absolute top-4 right-4 p-2 rounded-full hover:bg-secondary z-10" onClick={() => setDetails(null)}>
+            <X className="w-6 h-6" />
+          </button>
+          <div className="flex flex-col md:flex-row w-full h-full items-center justify-center p-8 gap-10" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="w-full md:w-1/2 max-w-md aspect-square rounded-3xl flex items-center justify-center"
+              style={{ background: `linear-gradient(135deg, ${colorFor(details.name)}22, ${colorFor(details.name)}66)` }}
+            >
+              <span className="font-display text-[10rem] font-black opacity-80" style={{ color: colorFor(details.name) }}>
+                {details.name.charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <div className="max-w-md">
+              <p className="text-sm uppercase tracking-widest text-muted-foreground">{details.category}</p>
+              <h2 className="font-display text-4xl font-extrabold mt-2">{details.name}</h2>
+              <p className="text-muted-foreground mt-1">by <b>{details.seller}</b></p>
+              {details.description && <p className="mt-4 text-sm">{details.description}</p>}
+              <p className="font-bold text-3xl mt-6">${Number(details.price).toFixed(2)}<span className="text-base text-muted-foreground font-normal">/{details.price_unit}</span></p>
+              <p className={`text-xs mt-2 font-medium ${details.stock_status === "In Stock" ? "text-success" : details.stock_status === "Limited" ? "text-warning" : "text-destructive"}`}>{details.stock_status}</p>
+              <button
+                disabled={details.stock_status === "Out of Stock"}
+                onClick={() => { addToCart(details); setDetails(null); }}
+                className="mt-8 bg-success text-success-foreground hover:opacity-90 disabled:bg-foreground disabled:opacity-60 px-8 py-4 rounded-xl font-bold uppercase tracking-wider"
+              >
+                Add to bag
+              </button>
+              {details.user_id === user?.id && (
+                <button
+                  onClick={() => { deleteProduct.mutate(details.id); setDetails(null); }}
+                  className="ml-3 mt-8 inline-flex items-center gap-2 px-4 py-4 text-destructive hover:bg-destructive/10 rounded-xl"
+                >
+                  <Trash2 className="w-4 h-4" /> Remove
+                </button>
+              )}
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {showAdd && (
-          <div className="stat-card space-y-3">
+      {/* Cart drawer */}
+      {showCart && (
+        <div className="fixed inset-0 z-50 bg-foreground/30" onClick={() => setShowCart(false)}>
+          <div className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-background shadow-2xl p-6 animate-slide-in-right overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-display text-xl font-bold">Your bag ({cartCount})</h3>
+              <button onClick={() => setShowCart(false)}><X className="w-5 h-5" /></button>
+            </div>
+            {cart.length === 0 ? (
+              <p className="text-muted-foreground text-sm">Your bag is empty.</p>
+            ) : (
+              <>
+                <div className="space-y-3">
+                  {cart.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between gap-3 pb-3 border-b border-border">
+                      <div
+                        className="w-14 h-14 rounded-xl flex items-center justify-center text-xl font-black"
+                        style={{ background: `${colorFor(item.name)}33`, color: colorFor(item.name) }}
+                      >
+                        {item.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{item.name}</p>
+                        <p className="text-xs text-muted-foreground">${item.price.toFixed(2)} × {item.qty}</p>
+                      </div>
+                      <p className="font-bold text-sm">${(item.price * item.qty).toFixed(2)}</p>
+                      <button onClick={() => removeFromCart(item.id)} className="text-destructive hover:bg-destructive/10 p-1 rounded">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-6 flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Total</span>
+                  <span className="font-display text-2xl font-bold">${cartTotal.toFixed(2)}</span>
+                </div>
+                <button
+                  onClick={checkout}
+                  disabled={placeOrder.isPending}
+                  className="w-full mt-4 bg-success text-success-foreground py-4 rounded-xl font-bold uppercase tracking-wider hover:opacity-90 disabled:opacity-60"
+                >
+                  {placeOrder.isPending ? "Processing…" : "Checkout"}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Orders drawer */}
+      {showOrders && (
+        <div className="fixed inset-0 z-50 bg-foreground/30" onClick={() => setShowOrders(false)}>
+          <div className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-background shadow-2xl p-6 animate-slide-in-right overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-display text-xl font-bold">Your orders</h3>
+              <button onClick={() => setShowOrders(false)}><X className="w-5 h-5" /></button>
+            </div>
+            {!orders || orders.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No orders yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {orders.map((o) => (
+                  <div key={o.id} className="flex items-center justify-between py-3 border-b border-border">
+                    <div>
+                      <p className="text-sm font-medium">{o.product_name}</p>
+                      <p className="text-xs text-muted-foreground">Qty {o.quantity} · ${Number(o.total_price).toFixed(2)}</p>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded-full ${o.status === "pending" ? "bg-warning/10 text-warning" : "bg-success/10 text-success"}`}>
+                      {o.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Add listing modal */}
+      {showAdd && (
+        <div className="fixed inset-0 z-50 bg-foreground/40 flex items-center justify-center p-4" onClick={() => setShowAdd(false)}>
+          <div className="bg-background rounded-2xl p-6 w-full max-w-2xl space-y-3 animate-scale-in" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold">List New Product</h3>
-              <button onClick={() => setShowAdd(false)}><X className="w-4 h-4" /></button>
+              <h3 className="font-display text-xl font-bold">List a new product</h3>
+              <button onClick={() => setShowAdd(false)}><X className="w-5 h-5" /></button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Product name" className="px-3 py-2 rounded-xl border border-border bg-background text-sm" />
+              <input value={form.seller} onChange={e => setForm({ ...form, seller: e.target.value })} placeholder="Seller / farm name" className="px-3 py-2 rounded-xl border border-border bg-background text-sm" />
               <div className="flex gap-2">
                 <input type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} placeholder="Price" className="flex-1 px-3 py-2 rounded-xl border border-border bg-background text-sm" />
                 <select value={form.price_unit} onChange={e => setForm({ ...form, price_unit: e.target.value })} className="px-3 py-2 rounded-xl border border-border bg-background text-sm">
-                  <option value="ton">/ton</option><option value="bag">/bag</option><option value="kit">/kit</option><option value="pcs">/pcs</option>
+                  <option value="ton">/ton</option><option value="bag">/bag</option><option value="kit">/kit</option><option value="pcs">/pcs</option><option value="kg">/kg</option>
                 </select>
               </div>
-              <input value={form.seller} onChange={e => setForm({ ...form, seller: e.target.value })} placeholder="Seller name" className="px-3 py-2 rounded-xl border border-border bg-background text-sm" />
-              <select value={form.stock_status} onChange={e => setForm({ ...form, stock_status: e.target.value })} className="px-3 py-2 rounded-xl border border-border bg-background text-sm">
-                <option>In Stock</option><option>Limited</option><option>Out of Stock</option>
-              </select>
               <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="px-3 py-2 rounded-xl border border-border bg-background text-sm">
                 <option>Produce</option><option>Seeds</option><option>Supplies</option><option>Equipment</option>
               </select>
-              <input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Description" className="px-3 py-2 rounded-xl border border-border bg-background text-sm" />
+              <select value={form.stock_status} onChange={e => setForm({ ...form, stock_status: e.target.value })} className="px-3 py-2 rounded-xl border border-border bg-background text-sm">
+                <option>In Stock</option><option>Limited</option><option>Out of Stock</option>
+              </select>
+              <input type="number" step="0.1" min="0" max="5" value={form.rating} onChange={e => setForm({ ...form, rating: Number(e.target.value) })} placeholder="Rating (0-5)" className="px-3 py-2 rounded-xl border border-border bg-background text-sm" />
+              <input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Description" className="sm:col-span-2 px-3 py-2 rounded-xl border border-border bg-background text-sm" />
             </div>
-            <button onClick={handleAdd} disabled={addProduct.isPending} className="bg-primary text-primary-foreground px-6 py-2 rounded-xl text-sm font-medium hover:opacity-90">
-              {addProduct.isPending ? "Listing..." : "List Product"}
+            <button onClick={handleAdd} disabled={addProduct.isPending} className="w-full bg-primary text-primary-foreground py-3 rounded-xl text-sm font-bold uppercase tracking-wide hover:opacity-90 disabled:opacity-60">
+              {addProduct.isPending ? "Listing…" : "Publish listing"}
             </button>
           </div>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {(products || []).map((l) => (
-            <div key={l.id} className="stat-card hover:shadow-md transition-shadow">
-              <div className="w-full h-28 bg-secondary rounded-xl mb-3 flex items-center justify-center">
-                <Package className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <h3 className="font-medium text-sm">{l.name}</h3>
-              <p className="font-display text-lg font-bold text-primary mt-1">${l.price}/{l.price_unit}</p>
-              <p className="text-xs text-muted-foreground mt-1">{l.seller}</p>
-              {l.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{l.description}</p>}
-              <div className="flex items-center justify-between mt-2">
-                <span className="flex items-center gap-1 text-xs"><Star className="w-3 h-3 text-warning fill-warning" /> {l.rating || "N/A"}</span>
-                <span className={`text-xs font-medium ${l.stock_status === "Limited" ? "text-warning" : l.stock_status === "Out of Stock" ? "text-destructive" : "text-success"}`}>{l.stock_status}</span>
-              </div>
-              <div className="flex gap-2 mt-3">
-                <button
-                  onClick={() => addToCart(l)}
-                  disabled={l.stock_status === "Out of Stock"}
-                  className="flex-1 py-2 rounded-xl text-xs font-medium bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50"
-                >
-                  Add to Cart
-                </button>
-                {l.user_id === user?.id && (
-                  <button onClick={() => deleteProduct.mutate(l.id)} className="p-2 rounded-xl hover:bg-destructive/10 text-destructive"><Trash2 className="w-4 h-4" /></button>
-                )}
-              </div>
-            </div>
-          ))}
         </div>
-      </div>
+      )}
     </AppLayout>
   );
 };
