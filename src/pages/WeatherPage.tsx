@@ -157,6 +157,12 @@ const WeatherPage = () => {
           </div>
         ) : (
           <>
+            <WeatherScene
+              kind={codeToScene(current.weather_code)}
+              label={weatherCodeLabel(current.weather_code)}
+              temp={current.temperature_2m}
+            />
+
             <div className="stat-card bg-gradient-to-br from-primary/5 to-chart-blue/5">
               <div className="flex items-center justify-between">
                 <div>
