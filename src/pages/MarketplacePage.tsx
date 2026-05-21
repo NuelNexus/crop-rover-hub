@@ -3,7 +3,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import { useProducts, useAddProduct, useDeleteProduct } from "@/hooks/useMarketplace";
 import { usePlaceOrder, useOrders } from "@/hooks/useOrders";
 import { useAuth } from "@/contexts/AuthContext";
-import { ShoppingCart, Package, Star, Plus, Trash2, X, CheckCircle, Sprout } from "lucide-react";
+import { ShoppingCart, Package, Plus, Trash2, X, CheckCircle, Sprout } from "lucide-react";
 import { toast } from "sonner";
 
 const TOP_TABS = ["All", "Featured", "In Stock", "Limited"] as const;
