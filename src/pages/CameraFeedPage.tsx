@@ -60,6 +60,22 @@ const CameraFeedPage = () => {
           </div>
         </div>
 
+        {/* Live stream */}
+        {activeDevice && (() => {
+          const dev = camDevices.find((d) => d.id === activeDevice);
+          return (
+            <div className="stat-card p-0 overflow-hidden">
+              <div className="flex items-center justify-between p-4 border-b border-border">
+                <div>
+                  <p className="font-display font-semibold">{dev?.device_name || "Camera"} — Live Stream</p>
+                  <p className="text-xs text-muted-foreground">{dev?.ip_address ? `http://${dev.ip_address}:81/stream` : "Awaiting heartbeat…"}</p>
+                </div>
+              </div>
+              <CameraStream ip={dev?.ip_address || null} isOnline={!!dev?.is_online} className="rounded-none" />
+            </div>
+          );
+        })()}
+
         {/* Controls */}
         <div className="stat-card">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
