@@ -180,52 +180,49 @@ const MarketplacePage = () => {
               <p className="text-muted-foreground">No products yet. Click <b>List</b> to add the first one.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="hiq-card-grid">
               {filtered.map((l) => {
-                const inBag = cart.some((c) => c.id === l.id);
-                const sale = (l.rating || 0) >= 4.5;
+                const accent = colorFor(l.name);
+                const initial = l.name.charAt(0).toUpperCase();
+                const outOfStock = l.stock_status === "Out of Stock";
                 return (
-                  <div
+                  <article
                     key={l.id}
-                    onClick={() => setDetails(l)}
-                    className="group cursor-pointer"
+                    className="hiq-product-card"
+                    style={{ ["--product-card--accent" as any]: accent }}
                   >
-                    <div
-                      className="relative aspect-square rounded-2xl overflow-hidden flex items-center justify-center"
-                      style={{ background: `linear-gradient(135deg, ${colorFor(l.name)}22, ${colorFor(l.name)}55)` }}
-                    >
-                      {sale && (
-                        <span className="absolute top-3 left-3 bg-destructive text-destructive-foreground text-[10px] font-bold uppercase px-2 py-1 rounded-md tracking-wider">
-                          Featured
-                        </span>
-                      )}
-                      <span
-                        className="font-display text-6xl font-black opacity-80"
-                        style={{ color: colorFor(l.name) }}
-                      >
-                        {l.name.charAt(0).toUpperCase()}
-                      </span>
+                    <span className="hiq-category">{l.category || "Product"}</span>
+                    <div className="hiq-thumb" style={{ background: `linear-gradient(135deg, ${accent}22, ${accent}55)` }}>
+                      <span className="hiq-thumb-fallback">{initial}</span>
+                    </div>
+                    <h2 className="hiq-heading" onClick={() => setDetails(l)} style={{ cursor: "pointer" }}>{l.name}</h2>
+                    <p className="hiq-price">${Number(l.price).toFixed(2)}<span style={{ fontWeight: 400, opacity: 0.85 }}> /{l.price_unit}</span></p>
+                    {l.description && <p className="hiq-desc">{l.description}</p>}
+                    <ul className="hiq-tags">
+                      <li className="hiq-tag">{l.stock_status}</li>
+                      <li className="hiq-tag">{l.seller}</li>
+                      {l.rating ? <li className="hiq-tag">★ {Number(l.rating).toFixed(1)}</li> : null}
+                    </ul>
+                    <div className="hiq-btn-wrap flex gap-2">
                       <button
-                        onClick={(e) => { e.stopPropagation(); if (l.stock_status !== "Out of Stock") addToCart(l); }}
-                        disabled={l.stock_status === "Out of Stock"}
-                        className={`absolute bottom-3 right-3 w-10 h-10 rounded-full flex items-center justify-center shadow transition ${
-                          inBag ? "bg-foreground text-background" : "bg-background hover:bg-foreground hover:text-background"
-                        } disabled:opacity-40`}
+                        className="hiq-purchase-btn flex-1"
+                        disabled={outOfStock}
+                        onClick={() => addToCart(l)}
                       >
                         <ShoppingCart className="w-4 h-4" />
+                        {outOfStock ? "Sold Out" : "Add To Cart"}
                       </button>
+                      {l.user_id === user?.id && (
+                        <button
+                          onClick={() => deleteProduct.mutate(l.id)}
+                          className="px-3 rounded-full text-destructive hover:bg-destructive/10"
+                          title="Remove listing"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
-                    <div className="mt-3">
-                      <p className="text-sm">
-                        <span className="font-bold">{l.seller}</span> <span className="text-muted-foreground">· {l.name}</span>
-                      </p>
-                      <p className="text-xs text-muted-foreground capitalize">{l.category}</p>
-                      <div className="flex items-center justify-between mt-1">
-                        <p className="font-bold">${Number(l.price).toFixed(2)}<span className="text-xs text-muted-foreground font-normal">/{l.price_unit}</span></p>
-                        <span className="flex items-center gap-1 text-xs"><Star className="w-3 h-3 text-warning fill-warning" /> {l.rating || "—"}</span>
-                      </div>
-                    </div>
-                  </div>
+                  </article>
                 );
               })}
             </div>
