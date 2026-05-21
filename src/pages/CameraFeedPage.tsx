@@ -8,6 +8,7 @@ import {
   useAnalyzeCapture,
   useDeleteCapture,
 } from "@/hooks/useCameraFeed";
+import CameraStream from "@/components/cam/CameraStream";
 import { Camera, Upload, Sparkles, Trash2, AlertTriangle, CheckCircle2, RefreshCw, MapPin } from "lucide-react";
 import { format } from "date-fns";
 
