@@ -5,6 +5,7 @@ import { useCameraCaptures, useRealtimeCaptures } from "@/hooks/useCameraFeed";
 import CameraStream from "@/components/cam/CameraStream";
 import { Bot, Camera, MapPin, Clock, Wifi, WifiOff, Activity, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
+import "@/styles/joystick.scss";
 
 const CropRoverPage = () => {
   const { data: devices } = useDevices();
@@ -36,6 +37,9 @@ const CropRoverPage = () => {
     const now = new Date();
     return d.toDateString() === now.toDateString();
   }).length;
+
+  const hoverItems = useMemo(() => Array.from({ length: 28 }, (_, i) => i + 1), []);
+  const ledItems = useMemo(() => Array.from({ length: 28 }, (_, i) => i + 1), []);
 
   return (
     <AppLayout>
@@ -117,6 +121,40 @@ const CropRoverPage = () => {
                   {activeCam && <span className="text-xs text-muted-foreground">{activeCam.device_name}</span>}
                 </div>
                 <CameraStream ip={activeCam?.ip_address || null} isOnline={!!activeCam?.is_online} className="rounded-none" />
+              </div>
+
+              <div className="stat-card p-0 overflow-hidden">
+                <div className="p-4 border-b border-border">
+                  <h2 className="font-display text-lg font-semibold">CropRover Joystick</h2>
+                  <p className="text-xs text-muted-foreground">Hover the ring to reveal menu items and tilt the stick.</p>
+                </div>
+                <div className="joystick-panel">
+                  <div className="joystick-wrap">
+                    <div className="joystick">
+                      {hoverItems.map((hover) => (
+                        <a key={`hover-${hover}`} className={`joystick__hover hover-${hover}`} href="#" />
+                      ))}
+                      {ledItems.map((led) => (
+                        <div key={`led-${led}`} className={`joystick__led led-${led}`} />
+                      ))}
+                      <div className="joystick__zero" />
+                      <div className="joystick__stick" />
+                      <div className="joystick__ball" />
+                      <ul className="menu" aria-hidden="true" />
+                    </div>
+                  </div>
+                  <div className="joystick-arrows" aria-label="CropRover controls">
+                    <div className="joystick-arrow is-empty" />
+                    <button className="joystick-arrow" aria-label="Move up">&#9650;</button>
+                    <div className="joystick-arrow is-empty" />
+                    <button className="joystick-arrow" aria-label="Move left">&#9664;</button>
+                    <div className="joystick-arrow is-empty" />
+                    <button className="joystick-arrow" aria-label="Move right">&#9654;</button>
+                    <div className="joystick-arrow is-empty" />
+                    <button className="joystick-arrow" aria-label="Move down">&#9660;</button>
+                    <div className="joystick-arrow is-empty" />
+                  </div>
+                </div>
               </div>
 
               <div>

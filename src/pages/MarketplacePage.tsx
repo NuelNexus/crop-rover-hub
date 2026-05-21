@@ -1,10 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useProducts, useAddProduct, useDeleteProduct } from "@/hooks/useMarketplace";
 import { usePlaceOrder, useOrders } from "@/hooks/useOrders";
 import { useAuth } from "@/contexts/AuthContext";
 import { ShoppingCart, Package, Plus, Trash2, X, CheckCircle, Sprout } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import SakuraOverlay from "@/components/marketplace/SakuraOverlay";
 
 const TOP_TABS = ["All", "Featured", "In Stock", "Limited"] as const;
 type TopTab = (typeof TOP_TABS)[number];
@@ -35,12 +37,27 @@ const MarketplacePage = () => {
   const [topTab, setTopTab] = useState<TopTab>("All");
   const [filter, setFilter] = useState<string | null>(null);
   const [details, setDetails] = useState<any | null>(null);
+  const [sakuraActive, setSakuraActive] = useState(false);
+  const [sakuraKey, setSakuraKey] = useState(0);
+  const [sakuraTargetId, setSakuraTargetId] = useState<string | null>(null);
 
   const [cart, setCart] = useState<{ id: string; name: string; price: number; qty: number }[]>([]);
   const [form, setForm] = useState({
     name: "", price: "", price_unit: "ton", seller: "", stock_status: "In Stock",
-    category: "Produce", description: "", rating: 0,
+    category: "Produce", description: "", rating: 0, image_url: "",
   });
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!imageFile) {
+      setImagePreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(imageFile);
+    setImagePreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [imageFile]);
 
   const filtered = useMemo(() => {
     let list = products || [];
@@ -53,11 +70,52 @@ const MarketplacePage = () => {
     return list;
   }, [products, topTab, filter]);
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!form.name.trim() || !form.price || !form.seller.trim()) return;
-    addProduct.mutate({ ...form, price: Number(form.price), rating: form.rating || null });
-    setForm({ name: "", price: "", price_unit: "ton", seller: "", stock_status: "In Stock", category: "Produce", description: "", rating: 0 });
+
+    let imageUrl = form.image_url?.trim() || null;
+
+    if (imageFile) {
+      if (!imageFile.type.startsWith("image/")) {
+        toast.error("Please upload an image file");
+        return;
+      }
+      if (imageFile.size > 5 * 1024 * 1024) {
+        toast.error("Image too large (max 5MB)");
+        return;
+      }
+
+      const path = `${user?.id || "public"}/${Date.now()}-${imageFile.name}`;
+      const { error: upErr } = await supabase.storage.from("marketplace").upload(path, imageFile, { upsert: false });
+      if (upErr) {
+        if (upErr.message?.toLowerCase().includes("bucket not found")) {
+          toast.error("Storage bucket 'marketplace' not found. Create it in Supabase Storage or run migrations.");
+        } else {
+          toast.error(upErr.message || "Image upload failed");
+        }
+        return;
+      }
+      const { data: pub } = supabase.storage.from("marketplace").getPublicUrl(path);
+      imageUrl = pub.publicUrl;
+    }
+
+    try {
+      await addProduct.mutateAsync({
+        ...form,
+        price: Number(form.price),
+        rating: form.rating || null,
+        image_url: imageUrl,
+      });
+    } catch {
+      return;
+    }
+
+    setForm({ name: "", price: "", price_unit: "ton", seller: "", stock_status: "In Stock", category: "Produce", description: "", rating: 0, image_url: "" });
+    setImageFile(null);
     setShowAdd(false);
+    setSakuraKey((k) => k + 1);
+    setSakuraTargetId(null);
+    setSakuraActive(true);
   };
 
   const addToCart = (product: any) => {
@@ -65,6 +123,9 @@ const MarketplacePage = () => {
     if (existing) setCart(cart.map((c) => (c.id === product.id ? { ...c, qty: c.qty + 1 } : c)));
     else setCart([...cart, { id: product.id, name: product.name, price: Number(product.price), qty: 1 }]);
     toast.success(`Added ${product.name} to cart`);
+    setSakuraKey((k) => k + 1);
+    setSakuraTargetId(product.id);
+    setSakuraActive(true);
   };
 
   const removeFromCart = (id: string) => setCart(cart.filter((c) => c.id !== id));
@@ -169,64 +230,81 @@ const MarketplacePage = () => {
         {/* Products */}
         <section className="flex-1 min-w-0">
           {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="rounded-2xl bg-secondary animate-pulse aspect-square" />
-              ))}
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="text-center py-20 border-2 border-dashed border-border rounded-2xl">
-              <Package className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-              <p className="text-muted-foreground">No products yet. Click <b>List</b> to add the first one.</p>
-            </div>
-          ) : (
-            <div className="hiq-card-grid">
-              {filtered.map((l) => {
-                const accent = colorFor(l.name);
-                const initial = l.name.charAt(0).toUpperCase();
-                const outOfStock = l.stock_status === "Out of Stock";
-                return (
-                  <article
-                    key={l.id}
-                    className="hiq-product-card"
-                    style={{ ["--product-card--accent" as any]: accent }}
-                  >
-                    <span className="hiq-category">{l.category || "Product"}</span>
-                    <div className="hiq-thumb" style={{ background: `linear-gradient(135deg, ${accent}22, ${accent}55)` }}>
-                      <span className="hiq-thumb-fallback">{initial}</span>
-                    </div>
-                    <h2 className="hiq-heading" onClick={() => setDetails(l)} style={{ cursor: "pointer" }}>{l.name}</h2>
-                    <p className="hiq-price">${Number(l.price).toFixed(2)}<span style={{ fontWeight: 400, opacity: 0.85 }}> /{l.price_unit}</span></p>
-                    {l.description && <p className="hiq-desc">{l.description}</p>}
-                    <ul className="hiq-tags">
-                      <li className="hiq-tag">{l.stock_status}</li>
-                      <li className="hiq-tag">{l.seller}</li>
-                      {l.rating ? <li className="hiq-tag">★ {Number(l.rating).toFixed(1)}</li> : null}
-                    </ul>
-                    <div className="hiq-btn-wrap flex gap-2">
-                      <button
-                        className="hiq-purchase-btn flex-1"
-                        disabled={outOfStock}
-                        onClick={() => addToCart(l)}
-                      >
-                        <ShoppingCart className="w-4 h-4" />
-                        {outOfStock ? "Sold Out" : "Add To Cart"}
-                      </button>
-                      {l.user_id === user?.id && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="rounded-2xl bg-secondary animate-pulse aspect-square" />
+                ))}
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="text-center py-20 border-2 border-dashed border-border rounded-2xl">
+                <Package className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
+                <p className="text-muted-foreground">No products yet. Click <b>List</b> to add the first one.</p>
+              </div>
+            ) : (
+              <div className="hiq-card-grid">
+                {filtered.map((l) => {
+                  const accent = colorFor(l.name);
+                  const initial = l.name.charAt(0).toUpperCase();
+                  const outOfStock = l.stock_status === "Out of Stock";
+                  return (
+                    <article
+                      key={l.id}
+                      className="hiq-product-card"
+                      style={{ ["--product-card--accent" as any]: accent }}
+                    >
+                      <span className="hiq-category">{l.category || "Product"}</span>
+                      <div className="hiq-thumb" style={{ background: `linear-gradient(135deg, ${accent}22, ${accent}55)` }}>
+                        {sakuraActive && sakuraTargetId === l.id && (
+                          <SakuraOverlay
+                            key={`sakura-${sakuraKey}`}
+                            active={sakuraActive}
+                            autoStopMs={5000}
+                            className="sakura-stage--thumb"
+                            onStop={() => {
+                              setSakuraActive(false);
+                              setSakuraTargetId(null);
+                            }}
+                            showToggleButton={false}
+                          />
+                        )}
+                        {l.image_url ? (
+                          <img src={l.image_url} alt={l.name} loading="lazy" />
+                        ) : (
+                          <span className="hiq-thumb-fallback">{initial}</span>
+                        )}
+                      </div>
+                      <h2 className="hiq-heading" onClick={() => setDetails(l)} style={{ cursor: "pointer" }}>{l.name}</h2>
+                      <p className="hiq-price">${Number(l.price).toFixed(2)}<span style={{ fontWeight: 400, opacity: 0.85 }}> /{l.price_unit}</span></p>
+                      {l.description && <p className="hiq-desc">{l.description}</p>}
+                      <ul className="hiq-tags">
+                        <li className="hiq-tag">{l.stock_status}</li>
+                        <li className="hiq-tag">{l.seller}</li>
+                        {l.rating ? <li className="hiq-tag">★ {Number(l.rating).toFixed(1)}</li> : null}
+                      </ul>
+                      <div className="hiq-btn-wrap flex gap-2">
                         <button
-                          onClick={() => deleteProduct.mutate(l.id)}
-                          className="px-3 rounded-full text-destructive hover:bg-destructive/10"
-                          title="Remove listing"
+                          className="hiq-purchase-btn flex-1"
+                          disabled={outOfStock}
+                          onClick={() => addToCart(l)}
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <ShoppingCart className="w-4 h-4" />
+                          {outOfStock ? "Sold Out" : "Add To Cart"}
                         </button>
-                      )}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
+                        {l.user_id === user?.id && (
+                          <button
+                            onClick={() => deleteProduct.mutate(l.id)}
+                            className="px-3 rounded-full text-destructive hover:bg-destructive/10"
+                            title="Remove listing"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
         </section>
       </div>
 
@@ -238,12 +316,16 @@ const MarketplacePage = () => {
           </button>
           <div className="flex flex-col md:flex-row w-full h-full items-center justify-center p-8 gap-10" onClick={(e) => e.stopPropagation()}>
             <div
-              className="w-full md:w-1/2 max-w-md aspect-square rounded-3xl flex items-center justify-center"
+              className="w-full md:w-1/2 max-w-md aspect-square rounded-3xl flex items-center justify-center overflow-hidden"
               style={{ background: `linear-gradient(135deg, ${colorFor(details.name)}22, ${colorFor(details.name)}66)` }}
             >
-              <span className="font-display text-[10rem] font-black opacity-80" style={{ color: colorFor(details.name) }}>
-                {details.name.charAt(0).toUpperCase()}
-              </span>
+              {details.image_url ? (
+                <img src={details.image_url} alt={details.name} className="w-full h-full object-cover" />
+              ) : (
+                <span className="font-display text-[10rem] font-black opacity-80" style={{ color: colorFor(details.name) }}>
+                  {details.name.charAt(0).toUpperCase()}
+                </span>
+              )}
             </div>
             <div className="max-w-md">
               <p className="text-sm uppercase tracking-widest text-muted-foreground">{details.category}</p>
@@ -350,35 +432,55 @@ const MarketplacePage = () => {
         </div>
       )}
 
-      {/* Add listing modal */}
       {showAdd && (
-        <div className="fixed inset-0 z-50 bg-foreground/40 flex items-center justify-center p-4" onClick={() => setShowAdd(false)}>
-          <div className="bg-background rounded-2xl p-6 w-full max-w-2xl space-y-3 animate-scale-in" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <h3 className="font-display text-xl font-bold">List a new product</h3>
-              <button onClick={() => setShowAdd(false)}><X className="w-5 h-5" /></button>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Product name" className="px-3 py-2 rounded-xl border border-border bg-background text-sm" />
-              <input value={form.seller} onChange={e => setForm({ ...form, seller: e.target.value })} placeholder="Seller / farm name" className="px-3 py-2 rounded-xl border border-border bg-background text-sm" />
-              <div className="flex gap-2">
-                <input type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} placeholder="Price" className="flex-1 px-3 py-2 rounded-xl border border-border bg-background text-sm" />
-                <select value={form.price_unit} onChange={e => setForm({ ...form, price_unit: e.target.value })} className="px-3 py-2 rounded-xl border border-border bg-background text-sm">
-                  <option value="ton">/ton</option><option value="bag">/bag</option><option value="kit">/kit</option><option value="pcs">/pcs</option><option value="kg">/kg</option>
-                </select>
+        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 relative ${sakuraActive ? "bg-foreground/50 backdrop-blur-sm" : "bg-foreground/40"}`} onClick={() => setShowAdd(false)}>
+          <div className="bg-background rounded-2xl p-6 w-full max-w-2xl space-y-3 animate-scale-in relative overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="relative z-10 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-display text-xl font-bold">List a new product</h3>
+                <button onClick={() => setShowAdd(false)}><X className="w-5 h-5" /></button>
               </div>
-              <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="px-3 py-2 rounded-xl border border-border bg-background text-sm">
-                <option>Produce</option><option>Seeds</option><option>Supplies</option><option>Equipment</option>
-              </select>
-              <select value={form.stock_status} onChange={e => setForm({ ...form, stock_status: e.target.value })} className="px-3 py-2 rounded-xl border border-border bg-background text-sm">
-                <option>In Stock</option><option>Limited</option><option>Out of Stock</option>
-              </select>
-              <input type="number" step="0.1" min="0" max="5" value={form.rating} onChange={e => setForm({ ...form, rating: Number(e.target.value) })} placeholder="Rating (0-5)" className="px-3 py-2 rounded-xl border border-border bg-background text-sm" />
-              <input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Description" className="sm:col-span-2 px-3 py-2 rounded-xl border border-border bg-background text-sm" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Product name" className="px-3 py-2 rounded-xl border border-border bg-background text-sm" />
+                <input value={form.seller} onChange={e => setForm({ ...form, seller: e.target.value })} placeholder="Seller / farm name" className="px-3 py-2 rounded-xl border border-border bg-background text-sm" />
+                <div className="flex gap-2">
+                  <input type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} placeholder="Price" className="flex-1 px-3 py-2 rounded-xl border border-border bg-background text-sm" />
+                  <select value={form.price_unit} onChange={e => setForm({ ...form, price_unit: e.target.value })} className="px-3 py-2 rounded-xl border border-border bg-background text-sm">
+                    <option value="ton">/ton</option><option value="bag">/bag</option><option value="kit">/kit</option><option value="pcs">/pcs</option><option value="kg">/kg</option>
+                  </select>
+                </div>
+                <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="px-3 py-2 rounded-xl border border-border bg-background text-sm">
+                  <option>Produce</option><option>Seeds</option><option>Supplies</option><option>Equipment</option>
+                </select>
+                <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                    className="px-3 py-2 rounded-xl border border-border bg-background text-sm"
+                  />
+                  <input
+                    value={form.image_url}
+                    onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+                    placeholder="Or paste image URL"
+                    className="px-3 py-2 rounded-xl border border-border bg-background text-sm"
+                  />
+                </div>
+                {imagePreview && (
+                  <div className="sm:col-span-2">
+                    <img src={imagePreview} alt="Preview" className="h-28 rounded-xl border border-border object-cover" />
+                  </div>
+                )}
+                <select value={form.stock_status} onChange={e => setForm({ ...form, stock_status: e.target.value })} className="px-3 py-2 rounded-xl border border-border bg-background text-sm">
+                  <option>In Stock</option><option>Limited</option><option>Out of Stock</option>
+                </select>
+                <input type="number" step="0.1" min="0" max="5" value={form.rating} onChange={e => setForm({ ...form, rating: Number(e.target.value) })} placeholder="Rating (0-5)" className="px-3 py-2 rounded-xl border border-border bg-background text-sm" />
+                <input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Description" className="sm:col-span-2 px-3 py-2 rounded-xl border border-border bg-background text-sm" />
+              </div>
+              <button onClick={handleAdd} disabled={addProduct.isPending} className="w-full bg-primary text-primary-foreground py-3 rounded-xl text-sm font-bold uppercase tracking-wide hover:opacity-90 disabled:opacity-60">
+                {addProduct.isPending ? "Listing…" : "Publish listing"}
+              </button>
             </div>
-            <button onClick={handleAdd} disabled={addProduct.isPending} className="w-full bg-primary text-primary-foreground py-3 rounded-xl text-sm font-bold uppercase tracking-wide hover:opacity-90 disabled:opacity-60">
-              {addProduct.isPending ? "Listing…" : "Publish listing"}
-            </button>
           </div>
         </div>
       )}
