@@ -28,7 +28,8 @@ const AuthPage = () => {
           },
         });
         if (error) throw error;
-        toast.success("Check your email for a verification link!");
+        toast.success("Account created!");
+        navigate("/");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
