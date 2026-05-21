@@ -8,6 +8,7 @@ import {
   useAnalyzeCapture,
   useDeleteCapture,
 } from "@/hooks/useCameraFeed";
+import CameraStream from "@/components/cam/CameraStream";
 import { Camera, Upload, Sparkles, Trash2, AlertTriangle, CheckCircle2, RefreshCw, MapPin } from "lucide-react";
 import { format } from "date-fns";
 
@@ -58,6 +59,22 @@ const CameraFeedPage = () => {
             <RefreshCw className="w-3 h-3" /> Auto-refreshing every 8s
           </div>
         </div>
+
+        {/* Live stream */}
+        {activeDevice && (() => {
+          const dev = camDevices.find((d) => d.id === activeDevice);
+          return (
+            <div className="stat-card p-0 overflow-hidden">
+              <div className="flex items-center justify-between p-4 border-b border-border">
+                <div>
+                  <p className="font-display font-semibold">{dev?.device_name || "Camera"} — Live Stream</p>
+                  <p className="text-xs text-muted-foreground">{dev?.ip_address ? `http://${dev.ip_address}:81/stream` : "Awaiting heartbeat…"}</p>
+                </div>
+              </div>
+              <CameraStream ip={dev?.ip_address || null} isOnline={!!dev?.is_online} className="rounded-none" />
+            </div>
+          );
+        })()}
 
         {/* Controls */}
         <div className="stat-card">
