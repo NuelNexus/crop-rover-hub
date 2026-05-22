@@ -15,10 +15,10 @@
 const char* ssid = "YOUR_WIFI_SSID";
 const char* password = "YOUR_WIFI_PASSWORD";
 
-const char* supabaseUrl = "https://YOUR_PROJECT.supabase.co";
-const char* supabaseKey = "YOUR_SUPABASE_ANON_KEY";
-const char* deviceId = "YOUR_DEVICE_ID";
-const char* deviceKey = "YOUR_DEVICE_KEY";
+const char* supabaseUrl = "https://ejaiyndbvvqnnvmdunkh.supabase.co";
+const char* supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqYWl5bmRidnZxbm52bWR1bmtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyMDkwNjEsImV4cCI6MjA5MDc4NTA2MX0.Q5JbIjfOZhdcupy2sHZDb-Qw0wl70k7P48F62IGXFS4";
+const char* deviceId = "0ea0088c-86ff-4b55-9bc1-201660e2da2e";
+const char* deviceKey = "18712ac9-71bc-4aff-8e84-80271c8e1724";
 
 // AI-Thinker ESP32-CAM pins
 #define PWDN_GPIO_NUM 32
