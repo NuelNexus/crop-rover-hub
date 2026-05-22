@@ -20,7 +20,6 @@ export type Database = {
           id: string
           is_read: boolean
           message: string
-          image_url: string | null
           severity: string
           user_id: string | null
         }
@@ -35,7 +34,6 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
-          image_url?: string | null
           is_read?: boolean
           message?: string
           severity?: string
@@ -50,7 +48,6 @@ export type Database = {
           expected_harvest: string | null
           field_location: string | null
           id: string
-          image_url?: string | null
           name: string
           notes: string | null
           planted_date: string | null
