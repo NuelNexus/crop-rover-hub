@@ -34,7 +34,7 @@ export const useAddProduct = () => {
   const { user } = useAuth();
   return useMutation({
     mutationFn: async (product: Omit<Product, "id" | "created_at" | "updated_at" | "user_id">) => {
-      const { data, error } = await supabase.from("marketplace_products").insert({ ...product, user_id: user!.id }).select().single();
+      const { data, error } = await supabase.from("marketplace_products").insert({ ...product, user_id: user!.id } as any).select().single();
       if (error) throw error;
       return data;
     },

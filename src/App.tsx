@@ -21,6 +21,7 @@ import SettingsPage from "./pages/SettingsPage";
 import AIAnalysisPage from "./pages/AIAnalysisPage";
 import ESP32Page from "./pages/ESP32Page";
 import CameraFeedPage from "./pages/CameraFeedPage";
+import MessagesPage from "./pages/MessagesPage";
 
 const queryClient = new QueryClient();
 
@@ -56,6 +57,7 @@ const AppRoutes = () => (
     <Route path="/ai-analysis" element={<ProtectedRoute><AIAnalysisPage /></ProtectedRoute>} />
     <Route path="/esp32" element={<ProtectedRoute><ESP32Page /></ProtectedRoute>} />
     <Route path="/camera-feed" element={<ProtectedRoute><CameraFeedPage /></ProtectedRoute>} />
+    <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
     <Route path="*" element={<NotFound />} />
   </Routes>
 );

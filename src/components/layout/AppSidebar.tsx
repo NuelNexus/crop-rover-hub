@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   Home, LayoutDashboard, BarChart3, Sprout, Tractor, DollarSign,
   CloudSun, Settings, LogOut, Bot, Warehouse, ShoppingCart, FileSearch,
-  Menu, X, Brain, Cpu, Camera,
+  Menu, X, Brain, Cpu, Camera, MessageCircle,
 } from "lucide-react";
 
 const navItems = [
@@ -20,6 +20,7 @@ const navItems = [
   { icon: Tractor, label: "Harvesting", path: "/harvesting" },
   { icon: DollarSign, label: "Finances", path: "/finances" },
   { icon: ShoppingCart, label: "Marketplace", path: "/marketplace" },
+  { icon: MessageCircle, label: "Messages", path: "/messages" },
   { icon: FileSearch, label: "Traceability", path: "/traceability" },
   { icon: CloudSun, label: "Weather", path: "/weather" },
   { icon: Settings, label: "Settings", path: "/settings" },
