@@ -1,57 +1,69 @@
 // ============================================
-// Arduino UNO R4 WiFi Storage Unit (FINAL FIX)
+// Arduino UNO R4 WiFi Storage Unit
+// Sensors: MQ gas, DHT11, RFID, LCD, Relay
 // ============================================
 
-#include <WiFiS3.h>
-#include <ArduinoHttpClient.h>
-#include <DHT.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
+#include <DHT.h>
 #include <SPI.h>
 #include <MFRC522.h>
-#include <Adafruit_MLX90614.h>
+#include <WiFiS3.h>
+#include <ArduinoHttpClient.h>
 
 // WiFi
 const char* ssid = "WIN-4MG19B8RE4H 2558";
 const char* password = "Mawulolo24";
 
-// Supabase (UNCHANGED)
+// Supabase
 const char* supabaseUrl = "https://ejaiyndbvvqnnvmdunkh.supabase.co";
 const char* supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqYWl5bmRidnZxbm52bWR1bmtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyMDkwNjEsImV4cCI6MjA5MDc4NTA2MX0.Q5JbIjfOZhdcupy2sHZDb-Qw0wl70k7P48F62IGXFS4";
 const char* deviceId = "0ea0088c-86ff-4b55-9bc1-201660e2da2e";
 const char* deviceKey = "18712ac9-71bc-4aff-8e84-80271c8e1724";
 
 // Pins
-static const uint8_t MQ135_A0 = A0;
-static const uint8_t MQ135_DOUT = 2;
+#define MQ_AO A0
+#define MQ_DO 2
 
-static const uint8_t DHT_PIN = 3;
-static const uint8_t DHT_TYPE = DHT22;
+#define DHT_PIN 4
+#define DHT_TYPE DHT11
 
-static const uint8_t LCD_ADDR = 0x27;
+#define RFID_SS_PIN 10
+#define RFID_RST_PIN 9
 
-static const uint8_t RFID_SS = 10;
-static const uint8_t RFID_RST = 9;
-
-static const uint8_t RELAY_1 = 8;
-static const uint8_t RELAY_2 = 7;
-static const uint8_t RELAY_3 = 6;
-static const uint8_t RELAY_4 = 5;
+#define LOCK_RELAY 5
+#define RELAY_ACTIVE_LOW true
 
 // Objects
-LiquidCrystal_I2C lcd(LCD_ADDR, 16, 4);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 DHT dht(DHT_PIN, DHT_TYPE);
-MFRC522 rfid(RFID_SS, RFID_RST);
-Adafruit_MLX90614 mlx;
+MFRC522 rfid(RFID_SS_PIN, RFID_RST_PIN);
+
+// Auth UID
+byte authorizedUID[] = {0xD1, 0x65, 0x58, 0x24};
 
 // State
+unsigned long lastSensorUpdate = 0;
+unsigned long lastHeartbeat = 0;
+unsigned long lastWifiAttempt = 0;
 String lastRfid = "----";
-unsigned long lastDisplaySwap = 0;
-bool displayMode = false;
 
-// =========================
-// Helper: host
-// =========================
+void relayOn(int pin) {
+  digitalWrite(pin, RELAY_ACTIVE_LOW ? LOW : HIGH);
+}
+
+void relayOff(int pin) {
+  digitalWrite(pin, RELAY_ACTIVE_LOW ? HIGH : LOW);
+}
+
+bool isAuthorizedCard() {
+  if (rfid.uid.size != 4) return false;
+  for (byte i = 0; i < 4; i++) {
+    if (rfid.uid.uidByte[i] != authorizedUID[i]) return false;
+  }
+  return true;
+}
+
 String getHostFromUrl(const String& url) {
   int start = url.indexOf("://");
   start = (start < 0) ? 0 : start + 3;
@@ -60,14 +72,10 @@ String getHostFromUrl(const String& url) {
   return url.substring(start, end);
 }
 
-// =========================
-// HTTP POST
-// =========================
 bool postJson(const String& body) {
   if (WiFi.status() != WL_CONNECTED) return false;
 
   String host = getHostFromUrl(String(supabaseUrl));
-
   WiFiSSLClient client;
   HttpClient http(client, host.c_str(), 443);
 
@@ -94,23 +102,21 @@ bool postJson(const String& body) {
   return status >= 200 && status < 300;
 }
 
-// =========================
-// Senders
-// =========================
 void sendHeartbeat() {
   String body = String("{\"type\":\"heartbeat\",\"ip\":\"") +
                 WiFi.localIP().toString() + "\"}";
   postJson(body);
 }
 
-void sendReadings(float t, float h, float ir, int air, int airD) {
+void sendReadings(float temperature, float humidity, int gasAnalog, int gasDigital) {
+  if (isnan(temperature) || isnan(humidity)) return;
+
   String body =
     String("{\"type\":\"readings\",\"ip\":\"") + WiFi.localIP().toString() + "\",\"readings\":["
-    "{\"sensor_type\":\"temperature\",\"value\":" + String(t,1) + ",\"unit\":\"C\"},"
-    "{\"sensor_type\":\"humidity\",\"value\":" + String(h,1) + ",\"unit\":\"%\"},"
-    "{\"sensor_type\":\"ir_temp\",\"value\":" + String(ir,1) + ",\"unit\":\"C\"},"
-    "{\"sensor_type\":\"mq135\",\"value\":" + String(air) + ",\"unit\":\"raw\"},"
-    "{\"sensor_type\":\"mq135_dout\",\"value\":" + String(airD) + ",\"unit\":\"level\"}"
+    "{\"sensor_type\":\"temperature\",\"value\":" + String(temperature, 1) + ",\"unit\":\"C\"},"
+    "{\"sensor_type\":\"humidity\",\"value\":" + String(humidity, 1) + ",\"unit\":\"%\"},"
+    "{\"sensor_type\":\"mq135\",\"value\":" + String(gasAnalog) + ",\"unit\":\"raw\"},"
+    "{\"sensor_type\":\"mq135_dout\",\"value\":" + String(gasDigital) + ",\"unit\":\"level\"}"
     "]}";
 
   postJson(body);
@@ -120,14 +126,11 @@ void sendRfid(uint32_t uid) {
   String body =
     String("{\"type\":\"readings\",\"ip\":\"") + WiFi.localIP().toString() +
     "\",\"readings\":[{\"sensor_type\":\"rfid_uid\",\"value\":" +
-    String(uid) + ",\"unit\":\"dec\"}]}");
+    String(uid) + ",\"unit\":\"dec\"}]}";
 
   postJson(body);
 }
 
-// =========================
-// RFID helper
-// =========================
 uint32_t uidToNumber(MFRC522::Uid* uid) {
   uint32_t value = 0;
   for (byte i = 0; i < uid->size; i++) {
@@ -136,57 +139,70 @@ uint32_t uidToNumber(MFRC522::Uid* uid) {
   return value;
 }
 
-// =========================
-// LCD
-// =========================
-void showLCD(String a, String b, String c, String d) {
+void showSensorValues(float temperature, float humidity, int gasAnalog, int gasDigital) {
+  Serial.print("Gas AO: ");
+  Serial.print(gasAnalog);
+  Serial.print(" | Gas DO: ");
+  Serial.print(gasDigital);
+  Serial.print(" | Temp: ");
+  Serial.print(temperature);
+  Serial.print(" C | Humidity: ");
+  Serial.print(humidity);
+  Serial.println(" %");
+
   lcd.clear();
-  lcd.setCursor(0,0); lcd.print(a);
-  lcd.setCursor(0,1); lcd.print(b);
-  lcd.setCursor(0,2); lcd.print(c);
-  lcd.setCursor(0,3); lcd.print(d);
+  lcd.setCursor(0, 0);
+  lcd.print("G:");
+  lcd.print(gasAnalog);
+  lcd.print(" T:");
+
+  if (isnan(temperature)) {
+    lcd.print("ERR");
+  } else {
+    lcd.print(temperature, 0);
+    lcd.print("C");
+  }
+
+  lcd.setCursor(0, 1);
+  lcd.print("H:");
+
+  if (isnan(humidity)) {
+    lcd.print("ERR");
+  } else {
+    lcd.print(humidity, 0);
+    lcd.print("%");
+  }
+
+  lcd.print(" ");
+
+  if (gasDigital == LOW) {
+    lcd.print("GAS");
+  } else {
+    lcd.print("OK");
+  }
 }
 
-// =========================
-// Fan control
-// =========================
-void setFans(float temp) {
-  if (isnan(temp)) return;
-
-  bool on = temp >= 24.0 && temp < 30.0;
-  digitalWrite(RELAY_1, on);
-  digitalWrite(RELAY_2, on);
-}
-
-// =========================
-// SETUP
-// =========================
 void setup() {
   Serial.begin(115200);
+  delay(1000);
 
-  pinMode(MQ135_DOUT, INPUT);
-
-  pinMode(RELAY_1, OUTPUT);
-  pinMode(RELAY_2, OUTPUT);
-  pinMode(RELAY_3, OUTPUT);
-  pinMode(RELAY_4, OUTPUT);
-
-  digitalWrite(RELAY_1, LOW);
-  digitalWrite(RELAY_2, LOW);
-  digitalWrite(RELAY_3, LOW);
-  digitalWrite(RELAY_4, LOW);
+  pinMode(MQ_DO, INPUT);
+  pinMode(LOCK_RELAY, OUTPUT);
+  relayOff(LOCK_RELAY);
 
   Wire.begin();
   lcd.init();
   lcd.backlight();
+  lcd.clear();
 
   dht.begin();
-  mlx.begin();
-
   SPI.begin();
   rfid.PCD_Init();
 
+  lcd.setCursor(0, 0);
   lcd.print("Connecting WiFi");
+  lcd.setCursor(0, 1);
+  lcd.print("Please wait");
 
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
@@ -196,64 +212,92 @@ void setup() {
 
   Serial.println("\nWiFi Connected: " + WiFi.localIP().toString());
 
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("System Ready");
+  lcd.setCursor(0, 1);
+  lcd.print("Scan Card");
+
+  Serial.println("System started");
+  Serial.println("Using DHT11");
+  Serial.println("Authorized UID: D1 65 58 24");
+
   sendHeartbeat();
+  lastHeartbeat = millis();
 }
 
-// =========================
-// LOOP
-// =========================
 void loop() {
-
-  // FIX: no WiFi.reconnect() on UNO R4 WiFi
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("WiFi lost. Reconnecting...");
-    WiFi.begin(ssid, password);
-    delay(3000);
+    unsigned long now = millis();
+    if (now - lastWifiAttempt > 5000) {
+      lastWifiAttempt = now;
+      Serial.println("WiFi lost. Reconnecting...");
+      WiFi.begin(ssid, password);
+    }
+    delay(500);
     return;
   }
 
-  float t = dht.readTemperature();
-  float h = dht.readHumidity();
-  float ir = mlx.readObjectTempC();
-  int air = analogRead(MQ135_A0);
-  int airD = digitalRead(MQ135_DOUT);
+  if (millis() - lastSensorUpdate >= 2000) {
+    lastSensorUpdate = millis();
+    int gasAnalog = analogRead(MQ_AO);
+    int gasDigital = digitalRead(MQ_DO);
+    float humidity = dht.readHumidity();
+    float temperature = dht.readTemperature();
 
-  setFans(t);
-
-  if (!isnan(t) && !isnan(h)) {
-    sendReadings(t, h, ir, air, airD);
+    showSensorValues(temperature, humidity, gasAnalog, gasDigital);
+    sendReadings(temperature, humidity, gasAnalog, gasDigital);
   }
 
   if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {
+    Serial.print("Card UID: ");
+
+    for (byte i = 0; i < rfid.uid.size; i++) {
+      if (rfid.uid.uidByte[i] < 0x10) {
+        Serial.print("0");
+      }
+      Serial.print(rfid.uid.uidByte[i], HEX);
+      Serial.print(" ");
+    }
+
+    Serial.println();
+
     uint32_t uid = uidToNumber(&rfid.uid);
     lastRfid = String(uid);
     sendRfid(uid);
 
+    if (isAuthorizedCard()) {
+      Serial.println("Access granted - unlocked");
+
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Access Granted");
+      lcd.setCursor(0, 1);
+      lcd.print("Unlocked");
+
+      relayOn(LOCK_RELAY);
+      delay(3000);
+      relayOff(LOCK_RELAY);
+    } else {
+      Serial.println("Access denied");
+
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Access Denied");
+      lcd.setCursor(0, 1);
+      lcd.print("Unknown Card");
+
+      delay(2000);
+    }
+
     rfid.PICC_HaltA();
     rfid.PCD_StopCrypto1();
+
+    lastSensorUpdate = 0;
   }
 
-  if (millis() - lastDisplaySwap > 2000) {
-    displayMode = !displayMode;
-    lastDisplaySwap = millis();
+  if (millis() - lastHeartbeat >= 30000) {
+    lastHeartbeat = millis();
+    sendHeartbeat();
   }
-
-  if (displayMode) {
-    showLCD(
-      "T:" + String(t,1) + "C H:" + String(h,0) + "%",
-      "IR:" + String(ir,1) + "C",
-      "Air:" + String(air),
-      "RFID:" + lastRfid
-    );
-  } else {
-    showLCD(
-      "Storage OK",
-      "RFID:" + lastRfid,
-      "WiFi OK",
-      WiFi.localIP().toString()
-    );
-  }
-
-  sendHeartbeat();
-  delay(30000);
 }
