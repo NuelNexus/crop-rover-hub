@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import { useProducts, useAddProduct, useDeleteProduct } from "@/hooks/useMarketplace";
 import { usePlaceOrder, useOrders } from "@/hooks/useOrders";
 import { useAuth } from "@/contexts/AuthContext";
-import { ShoppingCart, Package, Plus, Trash2, X, CheckCircle, Sprout } from "lucide-react";
+import { ShoppingCart, Package, Plus, Trash2, X, CheckCircle, Sprout, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import SakuraOverlay from "@/components/marketplace/SakuraOverlay";
@@ -25,6 +26,12 @@ const colorFor = (name: string) => {
 
 const MarketplacePage = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const messageSeller = (sellerId: string | null | undefined) => {
+    if (!sellerId) { toast.error("Seller info unavailable"); return; }
+    if (sellerId === user?.id) { toast.info("That's your own listing"); return; }
+    navigate(`/messages?to=${sellerId}`);
+  };
   const { data: products, isLoading } = useProducts();
   const { data: orders } = useOrders();
   const addProduct = useAddProduct();
@@ -290,6 +297,15 @@ const MarketplacePage = () => {
                           <ShoppingCart className="w-4 h-4" />
                           {outOfStock ? "Sold Out" : "Add To Cart"}
                         </button>
+                        {l.user_id !== user?.id && (
+                          <button
+                            onClick={() => messageSeller(l.user_id)}
+                            className="px-3 rounded-full hover:bg-secondary border border-border"
+                            title="Message seller"
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                          </button>
+                        )}
                         {l.user_id === user?.id && (
                           <button
                             onClick={() => deleteProduct.mutate(l.id)}
@@ -341,6 +357,14 @@ const MarketplacePage = () => {
               >
                 Add to bag
               </button>
+              {details.user_id !== user?.id && (
+                <button
+                  onClick={() => { messageSeller(details.user_id); setDetails(null); }}
+                  className="ml-3 mt-8 inline-flex items-center gap-2 px-4 py-4 border border-border hover:bg-secondary rounded-xl font-medium"
+                >
+                  <MessageCircle className="w-4 h-4" /> Message Seller
+                </button>
+              )}
               {details.user_id === user?.id && (
                 <button
                   onClick={() => { deleteProduct.mutate(details.id); setDetails(null); }}
