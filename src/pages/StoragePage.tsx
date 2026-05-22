@@ -22,7 +22,7 @@ const StoragePage = () => {
   const [form, setForm] = useState({ bin_name: "", crop_stored: "", temperature: 20, humidity: 50, fill_percentage: 0, spoilage_risk: "Low", status: "Good" });
 
   const { data: devices } = useDevices();
-  const storageDevices = (devices || []).filter((d) => d.device_type === "storage_unit");
+  const storageDevices = (devices || []).filter((d) => d.device_type === "storage_unit" || d.device_type === "uno_r4_storage");
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const { data: readings } = useSensorReadings(selectedDeviceId || undefined);
   useRealtimeSensorReadings(selectedDeviceId || undefined);

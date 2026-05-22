@@ -1,6 +1,6 @@
 import { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
-import { useDevices, useAddDevice, useDeleteDevice, useSensorReadings, useRealtimeSensorReadings, generateESP32Code } from "@/hooks/useESP32";
+import { useDevices, useAddDevice, useDeleteDevice, useSensorReadings, useRealtimeSensorReadings } from "@/hooks/useESP32";
 import { Cpu, Plus, Trash2, Copy, Wifi, WifiOff, X, Code, RefreshCw, Download } from "lucide-react";
 import { toast } from "sonner";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
@@ -13,6 +13,8 @@ const ESP32Page = () => {
   const [showAdd, setShowAdd] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [showCode, setShowCode] = useState<string | null>(null);
+  const [codeCache, setCodeCache] = useState<Record<string, string>>({});
+  const [loadingSketchType, setLoadingSketchType] = useState<string | null>(null);
   const [form, setForm] = useState({ device_name: "", device_type: "crop_rover", ip_address: "" });
 
   const { data: readings } = useSensorReadings(selectedDeviceId || undefined);
@@ -27,26 +29,58 @@ const ESP32Page = () => {
     setShowAdd(false);
   };
 
-  const buildCode = (device: any) =>
-    generateESP32Code(device, import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
-
-  const copyCode = (device: any) => {
-    navigator.clipboard.writeText(buildCode(device));
-    toast.success("ESP32 code copied to clipboard!");
+  const sketchPathByType: Record<string, string> = {
+    crop_rover: "/arduino/crop_rover.ino",
+    storage_unit: "/arduino/storage_unit_esp32.ino",
+    uno_r4_storage: "/arduino/uno_r4_storage.ino",
+    esp32_cam: "/arduino/esp32_cam.ino",
   };
 
-  const downloadCode = (device: any) => {
-    const blob = new Blob([buildCode(device)], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    const safeName = device.device_name.replace(/[^a-z0-9_-]+/gi, "_");
-    a.href = url;
-    a.download = `${safeName}_${device.device_type}.ino`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast.success("Arduino sketch downloaded!");
+  const fetchSketch = async (deviceType: string) => {
+    if (codeCache[deviceType]) return codeCache[deviceType];
+
+    const path = sketchPathByType[deviceType];
+    if (!path) throw new Error("Sketch not available for this device type.");
+
+    setLoadingSketchType(deviceType);
+    try {
+      const res = await fetch(path);
+      if (!res.ok) throw new Error(`Failed to load sketch (${res.status})`);
+      const text = await res.text();
+      setCodeCache((prev) => ({ ...prev, [deviceType]: text }));
+      return text;
+    } finally {
+      setLoadingSketchType((current) => (current === deviceType ? null : current));
+    }
+  };
+
+  const copyCode = async (device: any) => {
+    try {
+      const code = await fetchSketch(device.device_type);
+      await navigator.clipboard.writeText(code);
+      toast.success("Sketch copied to clipboard!");
+    } catch (e: any) {
+      toast.error(e.message || "Failed to copy sketch");
+    }
+  };
+
+  const downloadCode = async (device: any) => {
+    try {
+      const code = await fetchSketch(device.device_type);
+      const blob = new Blob([code], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safeName = device.device_name.replace(/[^a-z0-9_-]+/gi, "_");
+      a.href = url;
+      a.download = `${safeName}_${device.device_type}.ino`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("Arduino sketch downloaded!");
+    } catch (e: any) {
+      toast.error(e.message || "Failed to download sketch");
+    }
   };
 
   // Group readings by sensor_type for charting
@@ -146,7 +180,15 @@ const ESP32Page = () => {
                   <Copy className="w-3 h-3" /> Copy
                 </button>
                 <button
-                  onClick={(e) => { e.stopPropagation(); setShowCode(showCode === device.id ? null : device.id); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const next = showCode === device.id ? null : device.id;
+                    setShowCode(next);
+                    if (next) {
+                      const target = devices?.find((d) => d.id === next);
+                      if (target) fetchSketch(target.device_type).catch(() => undefined);
+                    }
+                  }}
                   className="flex items-center justify-center gap-1 py-2 px-3 rounded-xl text-xs font-medium bg-secondary hover:bg-secondary/80 transition-colors"
                 >
                   <Code className="w-3 h-3" />
@@ -162,7 +204,9 @@ const ESP32Page = () => {
               {showCode === device.id && (
                 <div className="mt-3 p-3 bg-foreground/5 rounded-xl overflow-x-auto max-h-64 overflow-y-auto">
                   <pre className="text-[10px] font-mono text-muted-foreground whitespace-pre">
-                    {generateESP32Code(device, import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY)}
+                    {loadingSketchType === device.device_type && !codeCache[device.device_type]
+                      ? "Loading sketch..."
+                      : (codeCache[device.device_type] || "Sketch not found.")}
                   </pre>
                 </div>
               )}
