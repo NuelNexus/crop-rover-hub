@@ -432,32 +432,32 @@ const SakuraOverlay = ({
         pointFlower.offset[1] = pointFlower.area.y * -1.0;
         pointFlower.offset[2] = pointFlower.area.z * zpos;
         gl.uniform3fv(prog.uniforms.uOffset, pointFlower.offset);
-        gl.drawArrays(gl.POINT, 0, pointFlower.numFlowers);
+        gl.drawArrays(gl.POINTS, 0, pointFlower.numFlowers);
 
         pointFlower.offset[0] = pointFlower.area.x * -1.0;
         pointFlower.offset[1] = pointFlower.area.y * 1.0;
         pointFlower.offset[2] = pointFlower.area.z * zpos;
         gl.uniform3fv(prog.uniforms.uOffset, pointFlower.offset);
-        gl.drawArrays(gl.POINT, 0, pointFlower.numFlowers);
+        gl.drawArrays(gl.POINTS, 0, pointFlower.numFlowers);
 
         pointFlower.offset[0] = pointFlower.area.x * 1.0;
         pointFlower.offset[1] = pointFlower.area.y * -1.0;
         pointFlower.offset[2] = pointFlower.area.z * zpos;
         gl.uniform3fv(prog.uniforms.uOffset, pointFlower.offset);
-        gl.drawArrays(gl.POINT, 0, pointFlower.numFlowers);
+        gl.drawArrays(gl.POINTS, 0, pointFlower.numFlowers);
 
         pointFlower.offset[0] = pointFlower.area.x * 1.0;
         pointFlower.offset[1] = pointFlower.area.y * 1.0;
         pointFlower.offset[2] = pointFlower.area.z * zpos;
         gl.uniform3fv(prog.uniforms.uOffset, pointFlower.offset);
-        gl.drawArrays(gl.POINT, 0, pointFlower.numFlowers);
+        gl.drawArrays(gl.POINTS, 0, pointFlower.numFlowers);
       }
 
       pointFlower.offset[0] = 0.0;
       pointFlower.offset[1] = 0.0;
       pointFlower.offset[2] = 0.0;
       gl.uniform3fv(prog.uniforms.uOffset, pointFlower.offset);
-      gl.drawArrays(gl.POINT, 0, pointFlower.numFlowers);
+      gl.drawArrays(gl.POINTS, 0, pointFlower.numFlowers);
 
       gl.bindBuffer(gl.ARRAY_BUFFER, null);
       unuseShader(prog);
@@ -666,7 +666,7 @@ const SakuraOverlay = ({
 
     try {
       makeCanvasFullScreen(canvas);
-      gl = canvas.getContext("experimental-webgl");
+      gl = (canvas.getContext("webgl") || canvas.getContext("experimental-webgl")) as WebGLRenderingContext;
     } catch (e) {
       console.error(e);
       return;
