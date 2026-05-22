@@ -82,6 +82,157 @@
   }
 }
 
+.walle-avatar {
+  display: block;
+  width: 100%;
+  height: 100%;
+  animation: walle-float 3.5s ease-in-out infinite;
+}
+
+.walle-avatar .head {
+  transform-origin: 50% 50%;
+  animation: walle-tilt 5s ease-in-out infinite;
+}
+
+.walle-avatar #lefteyeball,
+.walle-avatar #righteyeball {
+  transform-origin: 50% 50%;
+  animation: walle-blink 6s infinite;
+}
+
+.walle-avatar #leftarm {
+  transform-origin: 100% 0;
+  animation: walle-wave 4.5s ease-in-out infinite;
+}
+
+@keyframes walle-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes walle-tilt {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(2deg); }
+}
+
+@keyframes walle-blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  94%, 96% { transform: scaleY(0.1); }
+}
+
+@keyframes walle-wave {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(8deg); }
+}
+
+@property --rotation {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.gemini {
+  --border-size: 4px;
+  --gradient: conic-gradient(from var(--rotation) at 52% 49% in oklab, oklch(0.63 0.2 251.22) 27%, oklch(0.67 0.21 25.81) 33%, oklch(0.9 0.19 93.93) 41%, oklch(0.79 0.25 150.49) 49%, oklch(0.63 0.2 251.22) 65%, oklch(0.72 0.21 150.89) 93%, oklch(0.63 0.2 251.22));
+  animation: rotate 5s infinite linear;
+  border-radius: 4rem;
+  background: none;
+  position: relative;
+  padding: 0;
+  border: 2px solid hsl(var(--border));
+  width: 100%;
+}
+
+.gemini::after {
+  content: '';
+  position: absolute;
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--gradient);
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  z-index: -1;
+  animation: rotate 5s infinite linear;
+  filter: blur(15px);
+}
+
+.gemini .inner {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  padding: 0.75rem 1rem;
+  position: relative;
+  z-index: 2;
+  border-radius: inherit;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.gemini .border {
+  position: absolute;
+  inset: calc(var(--border-size) * -1);
+  mask: linear-gradient(white);
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+.gemini .border::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: var(--gradient);
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  z-index: -1;
+  filter: blur(5px);
+}
+
+.gemini-btn,
+.gemini-input {
+  color: hsl(var(--foreground));
+  background: none;
+  border: none;
+}
+
+.gemini-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem;
+  border-radius: 999px;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.gemini-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.gemini-btn:not(:disabled):hover {
+  background: hsl(var(--secondary));
+}
+
+.gemini-input {
+  font-size: 0.95rem;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 400;
+  width: 100%;
+}
+
+.gemini-input:focus {
+  outline: none;
+}
+
+.gemini-input:not(:placeholder-shown) {
+  color: hsl(var(--foreground));
+}
+
 /* ===== Product card design ===== */
 .hiq-card-grid {
   display: grid;

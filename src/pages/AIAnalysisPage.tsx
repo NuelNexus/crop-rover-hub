@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
-import { Brain, Send, Loader2, ImagePlus, X, User } from "lucide-react";
+import { Send, Loader2, ImagePlus, X, User } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "@/hooks/use-toast";
+import WalleAvatar from "@/components/avatars/WalleAvatar";
 
 type Part = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
 type Msg = { role: "user" | "assistant"; content: string | Part[]; display?: string; image?: string };
@@ -143,8 +144,8 @@ const AIAnalysisPage = () => {
     <AppLayout>
       <div className="flex flex-col h-[calc(100vh-7rem)]">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Brain className="w-5 h-5 text-primary" />
+          <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center overflow-hidden">
+            <WalleAvatar size={44} />
           </div>
           <div>
             <h1 className="font-display text-2xl font-bold">AI Analysis Chat</h1>
@@ -155,8 +156,8 @@ const AIAnalysisPage = () => {
         <div ref={scrollRef} className="flex-1 overflow-y-auto stat-card !p-4 space-y-4 mb-3">
           {messages.length === 0 && (
             <div className="h-full flex flex-col items-center justify-center text-center py-12">
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-                <Brain className="w-8 h-8 text-primary" />
+              <div className="w-20 h-20 rounded-3xl bg-primary/10 flex items-center justify-center mb-4 overflow-hidden">
+                <WalleAvatar size={72} />
               </div>
               <h2 className="font-display text-xl font-semibold mb-2">How can I help your farm today?</h2>
               <p className="text-sm text-muted-foreground mb-6 max-w-md">
@@ -179,8 +180,8 @@ const AIAnalysisPage = () => {
           {messages.map((m, i) => (
             <div key={i} className={`flex gap-3 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
               {m.role === "assistant" && (
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Brain className="w-4 h-4 text-primary" />
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  <WalleAvatar size={34} />
                 </div>
               )}
               <div className={`max-w-[80%] ${m.role === "user" ? "order-2" : ""}`}>
@@ -224,7 +225,7 @@ const AIAnalysisPage = () => {
               </button>
             </div>
           )}
-          <div className="flex items-end gap-2">
+          <div className="gemini">
             <input
               ref={fileRef}
               type="file"
@@ -232,30 +233,35 @@ const AIAnalysisPage = () => {
               className="hidden"
               onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
             />
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="p-2.5 rounded-xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-colors flex-shrink-0"
-              title="Upload image"
-            >
-              <ImagePlus className="w-5 h-5 text-muted-foreground" />
-            </button>
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={onKey}
-              placeholder="Ask about crops, pests, weather, or upload an image…"
-              rows={1}
-              className="flex-1 resize-none bg-secondary/50 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 max-h-32"
-              autoFocus
-            />
-            <button
-              onClick={send}
-              disabled={loading || (!input.trim() && !imageDataUrl)}
-              className="p-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 flex-shrink-0"
-            >
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-            </button>
+            <div className="inner">
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="gemini-btn"
+                title="Upload image"
+              >
+                <ImagePlus className="w-5 h-5" />
+              </button>
+              <input
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={onKey}
+                placeholder="Ask Clucky"
+                className="gemini-input"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={send}
+                disabled={loading || (!input.trim() && !imageDataUrl)}
+                className="gemini-btn"
+                title="Send"
+              >
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+              </button>
+            </div>
+            <div className="border"></div>
           </div>
         </div>
       </div>

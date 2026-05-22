@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useDevices, useSensorReadings, useRealtimeSensorReadings } from "@/hooks/useESP32";
 import { useCameraCaptures, useRealtimeCaptures } from "@/hooks/useCameraFeed";
@@ -40,6 +40,92 @@ const CropRoverPage = () => {
 
   const hoverItems = useMemo(() => Array.from({ length: 28 }, (_, i) => i + 1), []);
   const ledItems = useMemo(() => Array.from({ length: 28 }, (_, i) => i + 1), []);
+
+  const joystickRef = useRef<HTMLDivElement>(null);
+  const lastCommandAt = useRef(0);
+  const activeDirection = useRef<string | null>(null);
+  const pointerActive = useRef(false);
+  const pointerId = useRef<number | null>(null);
+
+  const controlEnabled = !!activeRover?.ip_address && !!activeRover?.is_online;
+  const commandUrl = activeRover?.ip_address ? `http://${activeRover.ip_address}/drive` : "";
+
+  const sendCommand = useCallback(
+    async (direction: "forward" | "backward" | "left" | "right" | "stop", speed: number) => {
+      if (!controlEnabled || !commandUrl) return;
+      const now = Date.now();
+      if (now - lastCommandAt.current < 120 && direction === activeDirection.current) return;
+
+      lastCommandAt.current = now;
+      activeDirection.current = direction;
+
+      try {
+        await fetch(commandUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ direction, speed }),
+        });
+      } catch {
+        // Ignore transient network errors; next command will retry.
+      }
+    },
+    [commandUrl, controlEnabled]
+  );
+
+  const stopRover = useCallback(() => {
+    sendCommand("stop", 0);
+  }, [sendCommand]);
+
+  const handleArrowDown = useCallback((direction: "forward" | "backward" | "left" | "right") => {
+    sendCommand(direction, 70);
+  }, [sendCommand]);
+
+  const handleArrowUp = useCallback(() => {
+    stopRover();
+  }, [stopRover]);
+
+  const updateFromPointer = useCallback((clientX: number, clientY: number) => {
+    const target = joystickRef.current;
+    if (!target) return;
+    const rect = target.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = clientX - cx;
+    const dy = clientY - cy;
+    const radius = rect.width / 2;
+    const distance = Math.min(Math.hypot(dx, dy), radius);
+    const deadzone = radius * 0.18;
+    if (distance < deadzone) {
+      stopRover();
+      return;
+    }
+    const speed = Math.round(((distance - deadzone) / (radius - deadzone)) * 100);
+    const direction = Math.abs(dx) > Math.abs(dy)
+      ? dx > 0 ? "right" : "left"
+      : dy > 0 ? "backward" : "forward";
+    sendCommand(direction, speed);
+  }, [sendCommand, stopRover]);
+
+  const handleJoystickDown = useCallback((event: React.PointerEvent) => {
+    if (!controlEnabled) return;
+    pointerActive.current = true;
+    pointerId.current = event.pointerId;
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    updateFromPointer(event.clientX, event.clientY);
+  }, [controlEnabled, updateFromPointer]);
+
+  const handleJoystickMove = useCallback((event: React.PointerEvent) => {
+    if (!pointerActive.current) return;
+    if (pointerId.current !== event.pointerId) return;
+    updateFromPointer(event.clientX, event.clientY);
+  }, [updateFromPointer]);
+
+  const handleJoystickUp = useCallback((event: React.PointerEvent) => {
+    if (pointerId.current !== event.pointerId) return;
+    pointerActive.current = false;
+    pointerId.current = null;
+    stopRover();
+  }, [stopRover]);
 
   return (
     <AppLayout>
@@ -126,13 +212,23 @@ const CropRoverPage = () => {
               <div className="stat-card p-0 overflow-hidden">
                 <div className="p-4 border-b border-border">
                   <h2 className="font-display text-lg font-semibold">CropRover Joystick</h2>
-                  <p className="text-xs text-muted-foreground">Hover the ring to reveal menu items and tilt the stick.</p>
+                  <p className="text-xs text-muted-foreground">
+                    {controlEnabled ? "Drag the stick or use arrows to drive." : "Connect a rover with IP to enable controls."}
+                  </p>
                 </div>
                 <div className="joystick-panel">
-                  <div className="joystick-wrap">
+                  <div
+                    className="joystick-wrap"
+                    ref={joystickRef}
+                    onPointerDown={handleJoystickDown}
+                    onPointerMove={handleJoystickMove}
+                    onPointerUp={handleJoystickUp}
+                    onPointerCancel={handleJoystickUp}
+                    onPointerLeave={handleJoystickUp}
+                  >
                     <div className="joystick">
                       {hoverItems.map((hover) => (
-                        <a key={`hover-${hover}`} className={`joystick__hover hover-${hover}`} href="#" />
+                        <span key={`hover-${hover}`} className={`joystick__hover hover-${hover}`} />
                       ))}
                       {ledItems.map((led) => (
                         <div key={`led-${led}`} className={`joystick__led led-${led}`} />
@@ -145,13 +241,49 @@ const CropRoverPage = () => {
                   </div>
                   <div className="joystick-arrows" aria-label="CropRover controls">
                     <div className="joystick-arrow is-empty" />
-                    <button className="joystick-arrow" aria-label="Move up">&#9650;</button>
+                    <button
+                      className="joystick-arrow"
+                      aria-label="Move up"
+                      onPointerDown={() => handleArrowDown("forward")}
+                      onPointerUp={handleArrowUp}
+                      onPointerLeave={handleArrowUp}
+                      disabled={!controlEnabled}
+                    >
+                      &#9650;
+                    </button>
                     <div className="joystick-arrow is-empty" />
-                    <button className="joystick-arrow" aria-label="Move left">&#9664;</button>
+                    <button
+                      className="joystick-arrow"
+                      aria-label="Move left"
+                      onPointerDown={() => handleArrowDown("left")}
+                      onPointerUp={handleArrowUp}
+                      onPointerLeave={handleArrowUp}
+                      disabled={!controlEnabled}
+                    >
+                      &#9664;
+                    </button>
                     <div className="joystick-arrow is-empty" />
-                    <button className="joystick-arrow" aria-label="Move right">&#9654;</button>
+                    <button
+                      className="joystick-arrow"
+                      aria-label="Move right"
+                      onPointerDown={() => handleArrowDown("right")}
+                      onPointerUp={handleArrowUp}
+                      onPointerLeave={handleArrowUp}
+                      disabled={!controlEnabled}
+                    >
+                      &#9654;
+                    </button>
                     <div className="joystick-arrow is-empty" />
-                    <button className="joystick-arrow" aria-label="Move down">&#9660;</button>
+                    <button
+                      className="joystick-arrow"
+                      aria-label="Move down"
+                      onPointerDown={() => handleArrowDown("backward")}
+                      onPointerUp={handleArrowUp}
+                      onPointerLeave={handleArrowUp}
+                      disabled={!controlEnabled}
+                    >
+                      &#9660;
+                    </button>
                     <div className="joystick-arrow is-empty" />
                   </div>
                 </div>
