@@ -17,9 +17,11 @@
 #include <TinyGPS++.h>
 #include <Wire.h>
 
-// Motor pin definitions
-const uint8_t RIGHT_ENABLE = 9;
-const uint8_t LEFT_ENABLE  = 10;
+// Motor pin definitions (L298N ENA/ENB)
+const uint8_t LEFT_ENABLE_A  = 10;
+const uint8_t LEFT_ENABLE_B  = A0;
+const uint8_t RIGHT_ENABLE_A = 9;
+const uint8_t RIGHT_ENABLE_B = A1;
 const uint8_t LEFT_IN1     = 12;
 const uint8_t LEFT_IN2     = 11;
 const uint8_t LEFT_IN3     = 6;
@@ -35,7 +37,8 @@ struct Motor {
   uint8_t in2;
   uint8_t in3;
   uint8_t in4;
-  uint8_t enable;
+  uint8_t enableA;
+  uint8_t enableB;
 
   void setDirection(bool forward, uint8_t speed) {
     if (speed == 0) {
@@ -43,11 +46,13 @@ struct Motor {
       digitalWrite(in2, LOW);
       digitalWrite(in3, LOW);
       digitalWrite(in4, LOW);
-      analogWrite(enable, 0);
+      analogWrite(enableA, 0);
+      analogWrite(enableB, 0);
       return;
     }
 
-    analogWrite(enable, speed);
+    analogWrite(enableA, speed);
+    analogWrite(enableB, speed);
     if (forward) {
       digitalWrite(in1, HIGH);
       digitalWrite(in2, LOW);
@@ -62,8 +67,8 @@ struct Motor {
   }
 };
 
-Motor leftMotor  = { LEFT_IN1,  LEFT_IN2,  LEFT_IN3,  LEFT_IN4,  LEFT_ENABLE  };
-Motor rightMotor = { RIGHT_IN1, RIGHT_IN2, RIGHT_IN3, RIGHT_IN4, RIGHT_ENABLE };
+Motor leftMotor  = { LEFT_IN1,  LEFT_IN2,  LEFT_IN3,  LEFT_IN4,  LEFT_ENABLE_A,  LEFT_ENABLE_B };
+Motor rightMotor = { RIGHT_IN1, RIGHT_IN2, RIGHT_IN3, RIGHT_IN4, RIGHT_ENABLE_A, RIGHT_ENABLE_B };
 
 // GPS via SoftwareSerial (RX=2, TX=3)
 SoftwareSerial gpsSerial(2, 3);
@@ -88,12 +93,14 @@ void setup() {
   pinMode(leftMotor.in2, OUTPUT);
   pinMode(leftMotor.in3, OUTPUT);
   pinMode(leftMotor.in4, OUTPUT);
-  pinMode(leftMotor.enable, OUTPUT);
+  pinMode(leftMotor.enableA, OUTPUT);
+  pinMode(leftMotor.enableB, OUTPUT);
   pinMode(rightMotor.in1, OUTPUT);
   pinMode(rightMotor.in2, OUTPUT);
   pinMode(rightMotor.in3, OUTPUT);
   pinMode(rightMotor.in4, OUTPUT);
-  pinMode(rightMotor.enable, OUTPUT);
+  pinMode(rightMotor.enableA, OUTPUT);
+  pinMode(rightMotor.enableB, OUTPUT);
 
   Wire.begin();
   stopMotors();
