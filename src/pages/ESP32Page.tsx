@@ -1,7 +1,7 @@
 import { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useDevices, useAddDevice, useDeleteDevice, useSensorReadings, useRealtimeSensorReadings } from "@/hooks/useESP32";
-import { Cpu, Plus, Trash2, Copy, Wifi, WifiOff, X, Code, RefreshCw, Download } from "lucide-react";
+import { Cpu, Plus, Trash2, Copy, Wifi, WifiOff, X, Code, RefreshCw, Download, KeyRound, Hash } from "lucide-react";
 import { toast } from "sonner";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { format } from "date-fns";
@@ -62,6 +62,24 @@ const ESP32Page = () => {
       toast.success("Sketch copied to clipboard!");
     } catch (e: any) {
       toast.error(e.message || "Failed to copy sketch");
+    }
+  };
+
+  const copyDeviceId = async (device: any) => {
+    try {
+      await navigator.clipboard.writeText(device.id);
+      toast.success("Device ID copied!");
+    } catch {
+      toast.error("Failed to copy device ID");
+    }
+  };
+
+  const copyDeviceKey = async (device: any) => {
+    try {
+      await navigator.clipboard.writeText(device.api_key);
+      toast.success("Device key copied!");
+    } catch {
+      toast.error("Failed to copy device key");
     }
   };
 
@@ -180,6 +198,18 @@ const ESP32Page = () => {
                   className="flex items-center justify-center gap-1 py-2 px-3 rounded-xl text-xs font-medium bg-secondary hover:bg-secondary/80 transition-colors"
                 >
                   <Copy className="w-3 h-3" /> Copy
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); copyDeviceId(device); }}
+                  className="flex items-center justify-center gap-1 py-2 px-3 rounded-xl text-xs font-medium bg-secondary hover:bg-secondary/80 transition-colors"
+                >
+                  <Hash className="w-3 h-3" /> Device ID
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); copyDeviceKey(device); }}
+                  className="flex items-center justify-center gap-1 py-2 px-3 rounded-xl text-xs font-medium bg-secondary hover:bg-secondary/80 transition-colors"
+                >
+                  <KeyRound className="w-3 h-3" /> Device Key
                 </button>
                 <button
                   onClick={(e) => {

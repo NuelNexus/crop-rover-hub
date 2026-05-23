@@ -9,7 +9,7 @@ import "@/styles/joystick.scss";
 
 const CropRoverPage = () => {
   const { data: devices } = useDevices();
-  const rovers = (devices || []).filter((d) => d.device_type === "crop_rover");
+  const rovers = (devices || []).filter((d) => d.device_type === "crop_rover" || d.device_type === "esp32_bot_control");
   const cams = (devices || []).filter((d) => d.device_type === "esp32_cam");
 
   const [roverId, setRoverId] = useState<string | undefined>(undefined);
@@ -135,7 +135,11 @@ const CropRoverPage = () => {
           <div className="flex gap-2">
             {rovers.length > 1 && (
               <select value={activeRover?.id || ""} onChange={(e) => setRoverId(e.target.value)} className="px-3 py-2 rounded-xl border border-border bg-background text-sm">
-                {rovers.map((d) => <option key={d.id} value={d.id}>{d.device_name}</option>)}
+                {rovers.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.device_name} ({d.device_type.replace("_", " ")})
+                  </option>
+                ))}
               </select>
             )}
             {cams.length > 1 && (

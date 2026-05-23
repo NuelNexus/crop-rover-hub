@@ -1,6 +1,6 @@
 // ============================================
 // CropRover Movement Controller
-// Board: Arduino Nano (ATmega328P)
+// Board: Arduino Uno (ATmega328P)
 // Hardware: L298N H-bridge + NEO-6M GPS (SoftwareSerial 2/3)
 // Pairs with the ESP32-CAM for vision; this Nano handles motors + GPS.
 //
@@ -19,9 +19,9 @@
 
 // Motor pin definitions (L298N ENA/ENB)
 const uint8_t LEFT_ENABLE_A  = 10;
-const uint8_t LEFT_ENABLE_B  = A0;
+const uint8_t LEFT_ENABLE_B  = 13;
 const uint8_t RIGHT_ENABLE_A = 9;
-const uint8_t RIGHT_ENABLE_B = A1;
+const uint8_t RIGHT_ENABLE_B = 2;
 const uint8_t LEFT_IN1     = 12;
 const uint8_t LEFT_IN2     = 11;
 const uint8_t LEFT_IN3     = 6;
