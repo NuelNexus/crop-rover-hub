@@ -34,6 +34,7 @@ const ESP32Page = () => {
     storage_unit: "/arduino/storage_unit_esp32.ino",
     uno_r4_storage: "/arduino/uno_r4_storage.ino",
     esp32_cam: "/arduino/esp32_cam.ino",
+    esp32_bot_control: "/arduino/esp32_bot_control.ino",
   };
 
   const fetchSketch = async (deviceType: string) => {
@@ -123,6 +124,7 @@ const ESP32Page = () => {
               <input value={form.device_name} onChange={(e) => setForm({ ...form, device_name: e.target.value })} placeholder="Device name" className="px-3 py-2 rounded-xl border border-border bg-background text-sm" />
               <select value={form.device_type} onChange={(e) => setForm({ ...form, device_type: e.target.value })} className="px-3 py-2 rounded-xl border border-border bg-background text-sm">
                 <option value="crop_rover">CropRover Bot</option>
+                <option value="esp32_bot_control">ESP32 Bot Control</option>
                 <option value="storage_unit">Storage Unit</option>
                 <option value="uno_r4_storage">Uno R4 Storage Unit</option>
                 <option value="esp32_cam">ESP32-CAM (Vision)</option>
