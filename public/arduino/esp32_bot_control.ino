@@ -123,6 +123,7 @@ void handleDrive() {
     speed = 0;
   }
 
+  Serial.printf("HTTP /drive received: direction=%s speed=%d\n", direction.c_str(), speed);
   sendCommandToArduino(direction, speed);
   server.send(200, "application/json", "{\"status\":\"ok\"}");
 }
