@@ -22,30 +22,48 @@ const uint8_t RIGHT_ENABLE = 9;
 const uint8_t LEFT_ENABLE  = 10;
 const uint8_t LEFT_IN1     = 12;
 const uint8_t LEFT_IN2     = 11;
+const uint8_t LEFT_IN3     = 6;
+const uint8_t LEFT_IN4     = 5;
 const uint8_t RIGHT_IN1    = 8;
 const uint8_t RIGHT_IN2    = 7;
+const uint8_t RIGHT_IN3    = 4;
+const uint8_t RIGHT_IN4    = 3;
 
 // Motor control struct
 struct Motor {
   uint8_t in1;
   uint8_t in2;
+  uint8_t in3;
+  uint8_t in4;
   uint8_t enable;
 
   void setDirection(bool forward, uint8_t speed) {
     if (speed == 0) {
       digitalWrite(in1, LOW);
       digitalWrite(in2, LOW);
+      digitalWrite(in3, LOW);
+      digitalWrite(in4, LOW);
       analogWrite(enable, 0);
       return;
     }
+
     analogWrite(enable, speed);
-    digitalWrite(in1, forward ? HIGH : LOW);
-    digitalWrite(in2, forward ? LOW : HIGH);
+    if (forward) {
+      digitalWrite(in1, HIGH);
+      digitalWrite(in2, LOW);
+      digitalWrite(in3, LOW);
+      digitalWrite(in4, LOW);
+    } else {
+      digitalWrite(in1, LOW);
+      digitalWrite(in2, LOW);
+      digitalWrite(in3, HIGH);
+      digitalWrite(in4, LOW);
+    }
   }
 };
 
-Motor leftMotor  = { LEFT_IN1,  LEFT_IN2,  LEFT_ENABLE  };
-Motor rightMotor = { RIGHT_IN1, RIGHT_IN2, RIGHT_ENABLE };
+Motor leftMotor  = { LEFT_IN1,  LEFT_IN2,  LEFT_IN3,  LEFT_IN4,  LEFT_ENABLE  };
+Motor rightMotor = { RIGHT_IN1, RIGHT_IN2, RIGHT_IN3, RIGHT_IN4, RIGHT_ENABLE };
 
 // GPS via SoftwareSerial (RX=2, TX=3)
 SoftwareSerial gpsSerial(2, 3);
@@ -68,9 +86,13 @@ void setup() {
 
   pinMode(leftMotor.in1, OUTPUT);
   pinMode(leftMotor.in2, OUTPUT);
+  pinMode(leftMotor.in3, OUTPUT);
+  pinMode(leftMotor.in4, OUTPUT);
   pinMode(leftMotor.enable, OUTPUT);
   pinMode(rightMotor.in1, OUTPUT);
   pinMode(rightMotor.in2, OUTPUT);
+  pinMode(rightMotor.in3, OUTPUT);
+  pinMode(rightMotor.in4, OUTPUT);
   pinMode(rightMotor.enable, OUTPUT);
 
   Wire.begin();
