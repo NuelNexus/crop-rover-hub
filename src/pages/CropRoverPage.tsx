@@ -47,29 +47,37 @@ const CropRoverPage = () => {
   const pointerActive = useRef(false);
   const pointerId = useRef<number | null>(null);
 
-  const controlEnabled = !!activeRover?.ip_address && !!activeRover?.is_online;
-  const commandUrl = activeRover?.ip_address ? `http://${activeRover.ip_address}/drive` : "";
+  const controlEnabled = !!activeRover?.ip_address;
+  const baseUrl = activeRover?.ip_address ? `http://${activeRover.ip_address}` : "";
 
   const sendCommand = useCallback(
     async (direction: "forward" | "backward" | "left" | "right" | "stop", speed: number) => {
-      if (!controlEnabled || !commandUrl) return;
+      if (!controlEnabled || !baseUrl) return;
       const now = Date.now();
       if (now - lastCommandAt.current < 120 && direction === activeDirection.current) return;
 
       lastCommandAt.current = now;
       activeDirection.current = direction;
 
+      const clamped = Math.max(0, Math.min(100, Math.round(speed)));
+      const cmdUrl = `${baseUrl}/cmd?c=${direction},${direction === "stop" ? 0 : clamped}`;
+      const driveUrl = `${baseUrl}/drive`;
+
+      // Fire to both endpoints (GET /cmd for crop_rover.ino, POST /drive for bot-control bridge).
+      // Use no-cors so the browser does not block on the ESP32's missing CORS headers.
       try {
-        await fetch(commandUrl, {
+        fetch(cmdUrl, { method: "GET", mode: "no-cors" }).catch(() => {});
+        fetch(driveUrl, {
           method: "POST",
+          mode: "no-cors",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ direction, speed }),
-        });
+          body: JSON.stringify({ direction, speed: clamped }),
+        }).catch(() => {});
       } catch {
-        // Ignore transient network errors; next command will retry.
+        // ignore
       }
     },
-    [commandUrl, controlEnabled]
+    [baseUrl, controlEnabled]
   );
 
   const stopRover = useCallback(() => {
