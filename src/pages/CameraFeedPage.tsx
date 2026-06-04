@@ -28,12 +28,16 @@ const CameraFeedPage = () => {
   const [deviceId, setDeviceId] = useState<string | undefined>(undefined);
   const [location, setLocation] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const identifyRef = useRef<HTMLInputElement>(null);
 
   const { data: captures, isLoading } = useCameraCaptures(deviceId);
   useRealtimeCaptures(deviceId);
   const upload = useUploadAndAnalyze();
   const analyze = useAnalyzeCapture();
   const del = useDeleteCapture();
+
+  const [identifyLoading, setIdentifyLoading] = useState(false);
+  const [identifyResult, setIdentifyResult] = useState<{ image: string; description: string } | null>(null);
 
   const activeDevice = deviceId || camDevices[0]?.id;
 
@@ -42,6 +46,28 @@ const CameraFeedPage = () => {
     if (!file || !activeDevice) return;
     upload.mutate({ file, deviceId: activeDevice, location });
     if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const handleIdentify = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (identifyRef.current) identifyRef.current.value = "";
+    if (!file) return;
+    setIdentifyLoading(true);
+    setIdentifyResult(null);
+    try {
+      const path = `identify/${Date.now()}-${file.name}`;
+      const { error: upErr } = await supabase.storage.from("crop-cam").upload(path, file);
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("crop-cam").getPublicUrl(path);
+      const image_url = pub.publicUrl;
+      const { data, error } = await supabase.functions.invoke("identify-item", { body: { image_url } });
+      if (error) throw error;
+      setIdentifyResult({ image: image_url, description: (data as any)?.description || "No description returned." });
+    } catch (err: any) {
+      toast.error(err.message || "Identification failed");
+    } finally {
+      setIdentifyLoading(false);
+    }
   };
 
   return (
