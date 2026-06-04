@@ -9,8 +9,10 @@ import {
   useDeleteCapture,
 } from "@/hooks/useCameraFeed";
 import CameraStream from "@/components/cam/CameraStream";
-import { Camera, Upload, Sparkles, Trash2, AlertTriangle, CheckCircle2, RefreshCw, MapPin } from "lucide-react";
+import { Camera, Upload, Sparkles, Trash2, AlertTriangle, CheckCircle2, RefreshCw, MapPin, ScanSearch, X } from "lucide-react";
 import { format } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const severityStyles: Record<string, string> = {
   high: "bg-destructive/10 text-destructive border-destructive/30",
