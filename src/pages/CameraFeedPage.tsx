@@ -93,16 +93,41 @@ const CameraFeedPage = () => {
           const dev = camDevices.find((d) => d.id === activeDevice);
           return (
             <div className="stat-card p-0 overflow-hidden">
-              <div className="flex items-center justify-between p-4 border-b border-border">
+              <div className="flex items-center justify-between p-4 border-b border-border gap-2 flex-wrap">
                 <div>
                   <p className="font-display font-semibold">{dev?.device_name || "Camera"} — Live Stream</p>
                   <p className="text-xs text-muted-foreground">{dev?.ip_address ? `http://${dev.ip_address}:81/stream` : "Awaiting heartbeat…"}</p>
+                </div>
+                <div>
+                  <input ref={identifyRef} type="file" accept="image/*" capture="environment" onChange={handleIdentify} hidden />
+                  <button
+                    onClick={() => identifyRef.current?.click()}
+                    disabled={identifyLoading}
+                    className="flex items-center gap-2 bg-gradient-to-r from-success to-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                  >
+                    <ScanSearch className={`w-4 h-4 ${identifyLoading ? "animate-pulse" : ""}`} />
+                    {identifyLoading ? "Identifying…" : "Identify Item / Food"}
+                  </button>
                 </div>
               </div>
               <CameraStream ip={dev?.ip_address || null} isOnline={!!dev?.is_online} className="rounded-none" />
             </div>
           );
         })()}
+
+        {/* Identify Result Modal */}
+        {identifyResult && (
+          <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setIdentifyResult(null)}>
+            <div className="bg-card rounded-2xl max-w-md w-full overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between p-4 border-b border-border">
+                <p className="font-display font-semibold flex items-center gap-2"><ScanSearch className="w-4 h-4 text-primary" /> AI Identification</p>
+                <button onClick={() => setIdentifyResult(null)}><X className="w-4 h-4" /></button>
+              </div>
+              <img src={identifyResult.image} alt="Identified" className="w-full aspect-video object-cover" />
+              <div className="p-4 text-sm leading-relaxed">{identifyResult.description}</div>
+            </div>
+          </div>
+        )}
 
         {/* Controls */}
         <div className="stat-card">
