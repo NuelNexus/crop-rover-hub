@@ -9,8 +9,10 @@ import {
   useDeleteCapture,
 } from "@/hooks/useCameraFeed";
 import CameraStream from "@/components/cam/CameraStream";
-import { Camera, Upload, Sparkles, Trash2, AlertTriangle, CheckCircle2, RefreshCw, MapPin } from "lucide-react";
+import { Camera, Upload, Sparkles, Trash2, AlertTriangle, CheckCircle2, RefreshCw, MapPin, ScanSearch, X } from "lucide-react";
 import { format } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const severityStyles: Record<string, string> = {
   high: "bg-destructive/10 text-destructive border-destructive/30",
@@ -26,12 +28,16 @@ const CameraFeedPage = () => {
   const [deviceId, setDeviceId] = useState<string | undefined>(undefined);
   const [location, setLocation] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const identifyRef = useRef<HTMLInputElement>(null);
 
   const { data: captures, isLoading } = useCameraCaptures(deviceId);
   useRealtimeCaptures(deviceId);
   const upload = useUploadAndAnalyze();
   const analyze = useAnalyzeCapture();
   const del = useDeleteCapture();
+
+  const [identifyLoading, setIdentifyLoading] = useState(false);
+  const [identifyResult, setIdentifyResult] = useState<{ image: string; description: string } | null>(null);
 
   const activeDevice = deviceId || camDevices[0]?.id;
 
@@ -40,6 +46,28 @@ const CameraFeedPage = () => {
     if (!file || !activeDevice) return;
     upload.mutate({ file, deviceId: activeDevice, location });
     if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const handleIdentify = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (identifyRef.current) identifyRef.current.value = "";
+    if (!file) return;
+    setIdentifyLoading(true);
+    setIdentifyResult(null);
+    try {
+      const path = `identify/${Date.now()}-${file.name}`;
+      const { error: upErr } = await supabase.storage.from("crop-cam").upload(path, file);
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("crop-cam").getPublicUrl(path);
+      const image_url = pub.publicUrl;
+      const { data, error } = await supabase.functions.invoke("identify-item", { body: { image_url } });
+      if (error) throw error;
+      setIdentifyResult({ image: image_url, description: (data as any)?.description || "No description returned." });
+    } catch (err: any) {
+      toast.error(err.message || "Identification failed");
+    } finally {
+      setIdentifyLoading(false);
+    }
   };
 
   return (
@@ -65,16 +93,41 @@ const CameraFeedPage = () => {
           const dev = camDevices.find((d) => d.id === activeDevice);
           return (
             <div className="stat-card p-0 overflow-hidden">
-              <div className="flex items-center justify-between p-4 border-b border-border">
+              <div className="flex items-center justify-between p-4 border-b border-border gap-2 flex-wrap">
                 <div>
                   <p className="font-display font-semibold">{dev?.device_name || "Camera"} — Live Stream</p>
                   <p className="text-xs text-muted-foreground">{dev?.ip_address ? `http://${dev.ip_address}:81/stream` : "Awaiting heartbeat…"}</p>
+                </div>
+                <div>
+                  <input ref={identifyRef} type="file" accept="image/*" capture="environment" onChange={handleIdentify} hidden />
+                  <button
+                    onClick={() => identifyRef.current?.click()}
+                    disabled={identifyLoading}
+                    className="flex items-center gap-2 bg-gradient-to-r from-success to-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                  >
+                    <ScanSearch className={`w-4 h-4 ${identifyLoading ? "animate-pulse" : ""}`} />
+                    {identifyLoading ? "Identifying…" : "Identify Item / Food"}
+                  </button>
                 </div>
               </div>
               <CameraStream ip={dev?.ip_address || null} isOnline={!!dev?.is_online} className="rounded-none" />
             </div>
           );
         })()}
+
+        {/* Identify Result Modal */}
+        {identifyResult && (
+          <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setIdentifyResult(null)}>
+            <div className="bg-card rounded-2xl max-w-md w-full overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between p-4 border-b border-border">
+                <p className="font-display font-semibold flex items-center gap-2"><ScanSearch className="w-4 h-4 text-primary" /> AI Identification</p>
+                <button onClick={() => setIdentifyResult(null)}><X className="w-4 h-4" /></button>
+              </div>
+              <img src={identifyResult.image} alt="Identified" className="w-full aspect-video object-cover" />
+              <div className="p-4 text-sm leading-relaxed">{identifyResult.description}</div>
+            </div>
+          </div>
+        )}
 
         {/* Controls */}
         <div className="stat-card">
