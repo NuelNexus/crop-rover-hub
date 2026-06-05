@@ -1,11 +1,12 @@
 // ============================================
-// CropRover ESP32 — Wi-Fi Motor + GPS Controller
+// CropRover ESP32 — 4WD Wi-Fi Motor + GPS Controller
 // Board: ESP32 Dev Module
-// Hardware: L298N H-bridge + NEO-6M GPS (UART2 on GPIO16/17)
+// Hardware: 2x L298N H-bridges (4 motors) + NEO-6M GPS on UART2 (GPIO 16/17)
 //
 // Endpoints (port 80):
 //   GET /            -> control web UI
-//   GET /cmd?c=...   -> e.g. forward,75 | backward,50 | left,60 | right,60 | stop,0 | gps
+//   GET /cmd?c=...   -> forward,75 | backward,50 | left,60 | right,60 |
+//                       steer,forward,75,30 | steer,backward,60,70 | stop,0 | gps
 //   GET /status      -> JSON {direction, speed, gps_valid, lat, lng, satellites}
 // ============================================
 
@@ -13,195 +14,198 @@
 #include <WiFi.h>
 #include <WebServer.h>
 
-// ─── WiFi Credentials ────────────────────────────────────────────────────────
-const char* WIFI_SSID     = "Nexus";
-const char* WIFI_PASSWORD = "Mineaxecraft21";
+// WiFi credentials. Fill these in before uploading.
+const char* WIFI_SSID     = "YOUR_WIFI_SSID";
+const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
 
-// ─── Motor Pins ──────────────────────────────────────────────────────────────
-const int LEFT_ENABLE       = 25;
-const int RIGHT_ENABLE      = 26;
+// Motor pins
+const int LEFT_ENABLE_A     = 25;   // ENA front-left  (IN1/IN2)
+const int LEFT_ENABLE_B     = 23;   // ENB rear-left   (IN3/IN4)
 const int LEFT_IN1          = 27;
 const int LEFT_IN2          = 14;
+const int LEFT_IN3          = 33;
+const int LEFT_IN4          = 32;
+
+const int RIGHT_ENABLE_A    = 26;   // ENA front-right (IN1/IN2)
+const int RIGHT_ENABLE_B    = 22;   // ENB rear-right  (IN3/IN4)
 const int RIGHT_IN1         = 12;
 const int RIGHT_IN2         = 13;
-const int LEFT_PWM_CHANNEL  = 0;
-const int RIGHT_PWM_CHANNEL = 1;
+const int RIGHT_IN3         = 18;
+const int RIGHT_IN4         = 19;
+
+const int LEFT_PWM_A        = 0;
+const int LEFT_PWM_B        = 2;
+const int RIGHT_PWM_A       = 1;
+const int RIGHT_PWM_B       = 3;
 const int PWM_FREQ          = 5000;
 const int PWM_RESOLUTION    = 8;
 
-// ─── GPS ─────────────────────────────────────────────────────────────────────
+// Flip one of these if a side spins opposite of the other during a forward test.
+const bool INVERT_LEFT_SIDE  = false;
+const bool INVERT_RIGHT_SIDE = false;
+
+// GPS
 TinyGPSPlus gps;
 HardwareSerial gpsSerial(2);
 
-// ─── Web Server ──────────────────────────────────────────────────────────────
+// Web server
 WebServer server(80);
 
-// ─── State ───────────────────────────────────────────────────────────────────
+// State
 unsigned long lastGPSTime = 0;
-String currentDirection   = "stop";
+String currentDirection   = "STOP";
 int    currentSpeed       = 0;
 
-// ─── Motor struct ────────────────────────────────────────────────────────────
-struct Motor {
-  int in1, in2, pwmChannel;
-  void setDirection(bool forward, int speed) {
-    if (speed == 0) {
-      digitalWrite(in1, LOW); digitalWrite(in2, LOW);
-      ledcWrite(pwmChannel, 0); return;
-    }
+struct MotorSide {
+  int in1, in2, pwmA;
+  int in3, in4, pwmB;
+  bool inverted;
+
+  void set(int speed) {
+    if (inverted) speed = -speed;
+    if (speed == 0) { stop(); return; }
+
+    bool forward = speed > 0;
+    int  pwm     = constrain(abs(speed), 0, 255);
+
     digitalWrite(in1, forward ? HIGH : LOW);
     digitalWrite(in2, forward ? LOW  : HIGH);
-    ledcWrite(pwmChannel, speed);
+    ledcWrite(pwmA, pwm);
+
+    digitalWrite(in3, forward ? HIGH : LOW);
+    digitalWrite(in4, forward ? LOW  : HIGH);
+    ledcWrite(pwmB, pwm);
+  }
+
+  void stop() {
+    digitalWrite(in1, LOW); digitalWrite(in2, LOW); ledcWrite(pwmA, 0);
+    digitalWrite(in3, LOW); digitalWrite(in4, LOW); ledcWrite(pwmB, 0);
   }
 };
 
-Motor leftMotor  = {LEFT_IN1,  LEFT_IN2,  LEFT_PWM_CHANNEL};
-Motor rightMotor = {RIGHT_IN1, RIGHT_IN2, RIGHT_PWM_CHANNEL};
+MotorSide leftSide  = {LEFT_IN1,  LEFT_IN2,  LEFT_PWM_A,
+                       LEFT_IN3,  LEFT_IN4,  LEFT_PWM_B, INVERT_LEFT_SIDE};
+MotorSide rightSide = {RIGHT_IN1, RIGHT_IN2, RIGHT_PWM_A,
+                       RIGHT_IN3, RIGHT_IN4, RIGHT_PWM_B, INVERT_RIGHT_SIDE};
 
-// ─── Motor control ───────────────────────────────────────────────────────────
-void moveForward(int s)  { leftMotor.setDirection(true,  s); rightMotor.setDirection(true,  s); }
-void moveBackward(int s) { leftMotor.setDirection(false, s); rightMotor.setDirection(false, s); }
-void turnLeft(int s)     { leftMotor.setDirection(false, s); rightMotor.setDirection(true,  s); }
-void turnRight(int s)    { leftMotor.setDirection(true,  s); rightMotor.setDirection(false, s); }
-void stopMotors()        { leftMotor.setDirection(true,  0); rightMotor.setDirection(true,  0); }
+void moveForward(int pwm)  { leftSide.set(pwm);   rightSide.set(pwm);   }
+void moveBackward(int pwm) { leftSide.set(-pwm);  rightSide.set(-pwm);  }
+void pivotLeft(int pwm)    { leftSide.set(-pwm);  rightSide.set(pwm);   }
+void pivotRight(int pwm)   { leftSide.set(pwm);   rightSide.set(-pwm);  }
+void stopMotors()          { leftSide.stop();     rightSide.stop();     }
 
-// ─── HTML Page ───────────────────────────────────────────────────────────────
-const char INDEX_HTML[] PROGMEM = R"rawliteral(
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ESP32 Rover Control</title>
-<style>
-  :root {
-    --bg:#0a0a0f; --panel:#10101a; --border:#1e2040;
-    --accent:#00f5a0; --accent2:#00d4ff; --danger:#ff3860;
-    --text:#c8d0e8; --dim:#4a5080;
-  }
-  * { box-sizing:border-box; margin:0; padding:0; }
-  body { background:var(--bg); color:var(--text); font-family:monospace;
-    min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:24px 16px; }
-  header { text-align:center; margin-bottom:24px; }
-  header h1 { font-size:1.4rem; letter-spacing:0.15em; color:var(--accent); }
-  .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; width:100%; max-width:520px; }
-  .card { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:20px; }
-  .card.full { grid-column:1/-1; }
-  .card-label { font-size:0.7rem; letter-spacing:0.25em; color:var(--dim); text-transform:uppercase; margin-bottom:14px; }
-  .dpad { display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(3,1fr); gap:8px; aspect-ratio:1; }
-  .dpad-btn { background:#15152a; border:1px solid var(--border); border-radius:8px;
-    color:var(--text); font-size:1.2rem; cursor:pointer; display:flex; align-items:center; justify-content:center; }
-  .dpad-btn:active { transform:scale(0.93); }
-  .dpad-btn.up{grid-column:2;grid-row:1;} .dpad-btn.left{grid-column:1;grid-row:2;}
-  .dpad-btn.stop{grid-column:2;grid-row:2;color:var(--danger);font-size:0.65rem;}
-  .dpad-btn.right{grid-column:3;grid-row:2;} .dpad-btn.down{grid-column:2;grid-row:3;}
-  .speed-value { font-size:2rem; color:var(--accent); text-align:center; margin-bottom:12px; }
-  input[type=range] { width:100%; }
-  .status-row { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border); font-size:0.8rem; }
-  .status-row:last-child{border:none;} .status-key{color:var(--dim);} .status-val{color:var(--accent2);}
-  .cmd-input { width:100%; background:#15152a; border:1px solid var(--border); border-radius:8px;
-    color:var(--text); font-family:monospace; padding:10px; outline:none; margin-bottom:8px; }
-  .send-btn { width:100%; background:var(--accent); border:none; border-radius:8px;
-    color:#000; font-weight:700; padding:10px; cursor:pointer; }
-</style>
-</head>
-<body>
-<header><h1>ESP32 ROVER CONTROL</h1></header>
-<div class="grid">
-  <div class="card">
-    <div class="card-label">Direction</div>
-    <div class="dpad">
-      <button class="dpad-btn up"    onclick="send('forward')">▲</button>
-      <button class="dpad-btn left"  onclick="send('left')">◀</button>
-      <button class="dpad-btn stop"  onclick="send('stop')">STOP</button>
-      <button class="dpad-btn right" onclick="send('right')">▶</button>
-      <button class="dpad-btn down"  onclick="send('backward')">▼</button>
-    </div>
-  </div>
-  <div class="card">
-    <div class="card-label">Speed</div>
-    <div class="speed-value" id="spd">75%</div>
-    <input type="range" min="0" max="100" value="75" id="sp" oninput="document.getElementById('spd').innerText=this.value+'%'">
-  </div>
-  <div class="card full">
-    <div class="card-label">Status</div>
-    <div class="status-row"><span class="status-key">DIRECTION</span><span class="status-val" id="dir">STOP</span></div>
-    <div class="status-row"><span class="status-key">SPEED</span><span class="status-val" id="cs">0%</span></div>
-    <div class="status-row"><span class="status-key">GPS</span><span class="status-val" id="gps">--</span></div>
-    <div class="status-row"><span class="status-key">SATELLITES</span><span class="status-val" id="sat">--</span></div>
-  </div>
-  <div class="card full">
-    <div class="card-label">Manual Command</div>
-    <input class="cmd-input" id="cmd" placeholder="e.g. forward,80">
-    <button class="send-btn" onclick="raw()">SEND</button>
-  </div>
-</div>
-<script>
-function send(dir){
-  var s=document.getElementById('sp').value;
-  fetch('/cmd?c='+dir+','+(dir==='stop'?0:s));
+void steerDrive(int pwm, int bias, bool reverse) {
+  // bias 0-100: 0=left arc, 50=straight, 100=right arc.
+  float b = (bias - 50) / 50.0f;
+  int   l = (int)(pwm * (b >= 0 ? 1.0f : 1.0f + b));
+  int   r = (int)(pwm * (b <= 0 ? 1.0f : 1.0f - b));
+
+  if (reverse) { l = -l; r = -r; }
+
+  leftSide.set(l);
+  rightSide.set(r);
 }
-function raw(){ fetch('/cmd?c='+encodeURIComponent(document.getElementById('cmd').value)); }
-setInterval(function(){
-  fetch('/status').then(r=>r.json()).then(j=>{
-    document.getElementById('dir').innerText=j.direction;
-    document.getElementById('cs').innerText=j.speed+'%';
-    document.getElementById('gps').innerText=j.gps_valid?(j.lat.toFixed(5)+','+j.lng.toFixed(5)):'No Fix';
-    document.getElementById('sat').innerText=j.satellites;
-  });
-}, 1500);
-</script>
-</body>
-</html>
-)rawliteral";
 
-// ─── Route handlers ──────────────────────────────────────────────────────────
-void handleRoot() { server.send_P(200, "text/html", INDEX_HTML); }
+void handleRoot() {
+  server.send(200, "text/html",
+    "<h2>ESP32 Rover</h2>"
+    "<p>Use /cmd?c=forward,75 | backward,50 | left,60 | right,60 | "
+    "steer,forward,75,30 | stop,0 | gps</p>"
+    "<p>Status: <a href='/status'>/status</a></p>");
+}
 
 void handleCmd() {
   if (!server.hasArg("c")) { server.send(400, "text/plain", "ERROR: missing param"); return; }
-  String command = server.arg("c");
-  command.trim();
+
+  String command = server.arg("c"); command.trim();
 
   if (command.equalsIgnoreCase("gps")) {
-    if (gps.location.isValid()) {
-      server.send(200, "text/plain",
-        "GPS:" + String(gps.location.lat(), 6) + "," + String(gps.location.lng(), 6));
-    } else {
-      server.send(200, "text/plain", "GPS:No Fix");
-    }
+    server.send(200, "text/plain", gps.location.isValid()
+      ? "GPS:" + String(gps.location.lat(), 6) + "," + String(gps.location.lng(), 6)
+      : "GPS:No Fix");
     return;
   }
 
-  int commaIndex = command.indexOf(',');
-  if (commaIndex == -1) { server.send(400, "text/plain", "ERROR: format is direction,speed"); return; }
+  int c1 = command.indexOf(',');
+  if (c1 == -1) { server.send(400, "text/plain", "ERROR: bad format"); return; }
 
-  String direction = command.substring(0, commaIndex);
-  direction.toLowerCase();
-  int speed    = command.substring(commaIndex + 1).toInt();
-  speed        = constrain(speed, 0, 100);
-  int pwmSpeed = (speed == 0) ? 0 : map(speed, 0, 100, 50, 255);
+  String dir = command.substring(0, c1); dir.trim(); dir.toLowerCase();
+  String rest = command.substring(c1 + 1); rest.trim();
 
-  if      (direction == "forward")  { moveForward(pwmSpeed);  currentDirection = "FORWARD";  }
-  else if (direction == "backward") { moveBackward(pwmSpeed); currentDirection = "BACKWARD"; }
-  else if (direction == "left")     { turnLeft(pwmSpeed);     currentDirection = "LEFT";     }
-  else if (direction == "right")    { turnRight(pwmSpeed);    currentDirection = "RIGHT";    }
-  else if (direction == "stop")     { stopMotors();           currentDirection = "STOP"; speed = 0; }
-  else { server.send(400, "text/plain", "ERROR: unknown direction"); return; }
+  if (dir == "stop") {
+    stopMotors();
+    currentDirection = "STOP"; currentSpeed = 0;
+    server.send(200, "text/plain", "OK:stop");
+    Serial.println("[CMD] stop");
+    return;
+  }
+
+  if (dir == "steer") {
+    String mode = "forward"; int speed = 0; int bias = 50;
+
+    int c2 = rest.indexOf(',');
+    String firstToken = (c2 == -1) ? rest : rest.substring(0, c2);
+    firstToken.trim(); firstToken.toLowerCase();
+
+    if (firstToken == "forward" || firstToken == "backward") {
+      mode = firstToken;
+      String remaining = (c2 == -1) ? "" : rest.substring(c2 + 1); remaining.trim();
+
+      int c3 = remaining.indexOf(',');
+      String speedPart = (c3 == -1) ? remaining : remaining.substring(0, c3);
+      speedPart.trim();
+      speed = constrain(speedPart.toInt(), 0, 100);
+
+      if (c3 != -1) {
+        String biasPart = remaining.substring(c3 + 1); biasPart.trim();
+        bias = constrain(biasPart.toInt(), 0, 100);
+      }
+    } else {
+      speed = constrain(firstToken.toInt(), 0, 100);
+      if (c2 != -1) {
+        String biasPart = rest.substring(c2 + 1); biasPart.trim();
+        bias = constrain(biasPart.toInt(), 0, 100);
+      }
+    }
+
+    int pwm = (speed == 0) ? 0 : map(speed, 0, 100, 50, 255);
+    bool reverse = (mode == "backward");
+    steerDrive(pwm, bias, reverse);
+
+    if (reverse) {
+      currentDirection = (bias < 45) ? "BACK-L" : (bias > 55) ? "BACK-R" : "BACKWARD";
+    } else {
+      currentDirection = (bias < 45) ? "STEER-L" : (bias > 55) ? "STEER-R" : "FORWARD";
+    }
+    currentSpeed = speed;
+
+    server.send(200, "text/plain", "OK:steer," + mode + "," + String(speed) + "," + String(bias));
+    Serial.printf("[CMD] steer mode=%s spd=%d bias=%d\n", mode.c_str(), speed, bias);
+    return;
+  }
+
+  int speed = constrain(rest.toInt(), 0, 100);
+  int pwm = (speed == 0) ? 0 : map(speed, 0, 100, 50, 255);
+
+  if      (dir == "forward")  { moveForward(pwm);  currentDirection = "FORWARD";  }
+  else if (dir == "backward") { moveBackward(pwm); currentDirection = "BACKWARD"; }
+  else if (dir == "left")     { pivotLeft(pwm);    currentDirection = "PIVOT-L";  }
+  else if (dir == "right")    { pivotRight(pwm);   currentDirection = "PIVOT-R";  }
+  else { server.send(400, "text/plain", "ERROR: unknown command"); return; }
 
   currentSpeed = speed;
-  server.send(200, "text/plain", "OK:" + direction + "," + String(speed));
-  Serial.printf("[CMD] %s @ %d%%\n", direction.c_str(), speed);
+  server.send(200, "text/plain", "OK:" + dir + "," + String(speed));
+  Serial.printf("[CMD] %s @ %d%%\n", dir.c_str(), speed);
 }
 
 void handleStatus() {
   String json = "{";
   json += "\"direction\":\"" + currentDirection + "\",";
-  json += "\"speed\":"       + String(currentSpeed) + ",";
-  json += "\"gps_valid\":"   + String(gps.location.isValid() ? "true" : "false") + ",";
+  json += "\"speed\":" + String(currentSpeed) + ",";
+  json += "\"gps_valid\":" + String(gps.location.isValid() ? "true" : "false") + ",";
   if (gps.location.isValid()) {
-    json += "\"lat\":"        + String(gps.location.lat(), 6) + ",";
-    json += "\"lng\":"        + String(gps.location.lng(), 6) + ",";
+    json += "\"lat\":" + String(gps.location.lat(), 6) + ",";
+    json += "\"lng\":" + String(gps.location.lng(), 6) + ",";
     json += "\"satellites\":" + String(gps.satellites.value());
   } else {
     json += "\"lat\":0,\"lng\":0,\"satellites\":0";
@@ -210,17 +214,21 @@ void handleStatus() {
   server.send(200, "application/json", json);
 }
 
-// ─── Setup ───────────────────────────────────────────────────────────────────
 void setup() {
   Serial.begin(115200);
   gpsSerial.begin(9600, SERIAL_8N1, 16, 17);
 
-  pinMode(LEFT_IN1,  OUTPUT); pinMode(LEFT_IN2,  OUTPUT);
-  pinMode(RIGHT_IN1, OUTPUT); pinMode(RIGHT_IN2, OUTPUT);
-  ledcSetup(LEFT_PWM_CHANNEL,  PWM_FREQ, PWM_RESOLUTION);
-  ledcAttachPin(LEFT_ENABLE,  LEFT_PWM_CHANNEL);
-  ledcSetup(RIGHT_PWM_CHANNEL, PWM_FREQ, PWM_RESOLUTION);
-  ledcAttachPin(RIGHT_ENABLE, RIGHT_PWM_CHANNEL);
+  int pins[] = {
+    LEFT_IN1, LEFT_IN2, LEFT_IN3, LEFT_IN4,
+    RIGHT_IN1, RIGHT_IN2, RIGHT_IN3, RIGHT_IN4
+  };
+  for (int p : pins) pinMode(p, OUTPUT);
+
+  ledcSetup(LEFT_PWM_A,  PWM_FREQ, PWM_RESOLUTION); ledcAttachPin(LEFT_ENABLE_A,  LEFT_PWM_A);
+  ledcSetup(LEFT_PWM_B,  PWM_FREQ, PWM_RESOLUTION); ledcAttachPin(LEFT_ENABLE_B,  LEFT_PWM_B);
+  ledcSetup(RIGHT_PWM_A, PWM_FREQ, PWM_RESOLUTION); ledcAttachPin(RIGHT_ENABLE_A, RIGHT_PWM_A);
+  ledcSetup(RIGHT_PWM_B, PWM_FREQ, PWM_RESOLUTION); ledcAttachPin(RIGHT_ENABLE_B, RIGHT_PWM_B);
+
   stopMotors();
 
   Serial.printf("Connecting to %s", WIFI_SSID);
@@ -237,7 +245,6 @@ void setup() {
   Serial.println("Web server started.");
 }
 
-// ─── Loop ────────────────────────────────────────────────────────────────────
 void loop() {
   server.handleClient();
   while (gpsSerial.available()) gps.encode(gpsSerial.read());
