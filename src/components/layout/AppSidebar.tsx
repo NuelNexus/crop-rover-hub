@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import {
   Home, LayoutDashboard, BarChart3, Sprout, Tractor, DollarSign,
   CloudSun, Settings, LogOut, Bot, Warehouse, ShoppingCart, FileSearch,
@@ -71,7 +72,8 @@ const AppSidebar = () => {
         })}
       </nav>
 
-      <div className="px-3 pb-6">
+      <div className="px-3 pb-6 space-y-1">
+        <LanguageSwitcher />
         <button
           onClick={handleLogout}
           className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-sidebar-accent w-full transition-colors text-sidebar-foreground"
