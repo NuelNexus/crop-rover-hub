@@ -28,7 +28,6 @@ const CameraFeedPage = () => {
   const [deviceId, setDeviceId] = useState<string | undefined>(undefined);
   const [location, setLocation] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
-  const identifyRef = useRef<HTMLInputElement>(null);
 
   const { data: captures, isLoading } = useCameraCaptures(deviceId);
   useRealtimeCaptures(deviceId);
@@ -40,6 +39,7 @@ const CameraFeedPage = () => {
   const [identifyResult, setIdentifyResult] = useState<{ image: string; description: string } | null>(null);
 
   const activeDevice = deviceId || camDevices[0]?.id;
+  const activeDeviceObj = camDevices.find((d) => d.id === activeDevice);
 
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -48,15 +48,42 @@ const CameraFeedPage = () => {
     if (fileRef.current) fileRef.current.value = "";
   };
 
-  const handleIdentify = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (identifyRef.current) identifyRef.current.value = "";
-    if (!file) return;
+  const captureFrameFromCamera = async (): Promise<Blob | null> => {
+    const ip = activeDeviceObj?.ip_address;
+    if (!ip) throw new Error("Camera IP unknown — power on the ESP32-CAM first");
+    // ESP32-CAM exposes /capture on port 80 returning a JPEG snapshot
+    const url = `http://${ip}/capture?_t=${Date.now()}`;
+    try {
+      const r = await fetch(url, { mode: "cors" });
+      if (r.ok) return await r.blob();
+    } catch {}
+    // Fallback: draw the MJPEG stream <img> onto a canvas (needs CORS-enabled firmware)
+    const img = document.querySelector<HTMLImageElement>('img[alt="Live camera stream"]');
+    if (img && img.naturalWidth) {
+      const c = document.createElement("canvas");
+      c.width = img.naturalWidth;
+      c.height = img.naturalHeight;
+      const ctx = c.getContext("2d");
+      if (!ctx) throw new Error("Canvas unsupported");
+      try {
+        ctx.drawImage(img, 0, 0);
+        return await new Promise((res) => c.toBlob((b) => res(b), "image/jpeg", 0.9));
+      } catch {
+        throw new Error("Browser blocked frame capture (CORS). Enable CORS on ESP32-CAM or open the app over HTTP.");
+      }
+    }
+    throw new Error("Failed to capture frame from camera");
+  };
+
+  const handleIdentify = async () => {
+    if (!activeDevice) { toast.error("Select a camera first"); return; }
     setIdentifyLoading(true);
     setIdentifyResult(null);
     try {
-      const path = `identify/${Date.now()}-${file.name}`;
-      const { error: upErr } = await supabase.storage.from("crop-cam").upload(path, file);
+      const blob = await captureFrameFromCamera();
+      if (!blob) throw new Error("Empty frame");
+      const path = `identify/${activeDevice}/${Date.now()}.jpg`;
+      const { error: upErr } = await supabase.storage.from("crop-cam").upload(path, blob, { contentType: "image/jpeg" });
       if (upErr) throw upErr;
       const { data: pub } = supabase.storage.from("crop-cam").getPublicUrl(path);
       const image_url = pub.publicUrl;
@@ -99,14 +126,13 @@ const CameraFeedPage = () => {
                   <p className="text-xs text-muted-foreground">{dev?.ip_address ? `http://${dev.ip_address}:81/stream` : "Awaiting heartbeat…"}</p>
                 </div>
                 <div>
-                  <input ref={identifyRef} type="file" accept="image/*" capture="environment" onChange={handleIdentify} hidden />
                   <button
-                    onClick={() => identifyRef.current?.click()}
+                    onClick={handleIdentify}
                     disabled={identifyLoading}
                     className="flex items-center gap-2 bg-gradient-to-r from-success to-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-50"
                   >
                     <ScanSearch className={`w-4 h-4 ${identifyLoading ? "animate-pulse" : ""}`} />
-                    {identifyLoading ? "Identifying…" : "Identify Item / Food"}
+                    {identifyLoading ? "Capturing & identifying…" : "Identify Item / Food"}
                   </button>
                 </div>
               </div>
