@@ -126,14 +126,13 @@ const CameraFeedPage = () => {
                   <p className="text-xs text-muted-foreground">{dev?.ip_address ? `http://${dev.ip_address}:81/stream` : "Awaiting heartbeat…"}</p>
                 </div>
                 <div>
-                  <input ref={identifyRef} type="file" accept="image/*" capture="environment" onChange={handleIdentify} hidden />
                   <button
-                    onClick={() => identifyRef.current?.click()}
+                    onClick={handleIdentify}
                     disabled={identifyLoading}
                     className="flex items-center gap-2 bg-gradient-to-r from-success to-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-50"
                   >
                     <ScanSearch className={`w-4 h-4 ${identifyLoading ? "animate-pulse" : ""}`} />
-                    {identifyLoading ? "Identifying…" : "Identify Item / Food"}
+                    {identifyLoading ? "Capturing & identifying…" : "Identify Item / Food"}
                   </button>
                 </div>
               </div>
