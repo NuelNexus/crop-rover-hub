@@ -1,4 +1,4 @@
-// Batch UI translation via Lovable AI Gateway
+// High-accuracy batch UI translation via Lovable AI Gateway (Gemini 2.5 Pro)
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -23,19 +23,24 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Chunk to keep prompts manageable
     const chunks: string[][] = [];
-    const CHUNK = 80;
+    const CHUNK = 60;
     for (let i = 0; i < strings.length; i += CHUNK) chunks.push(strings.slice(i, i + CHUNK));
 
     const translations: string[] = [];
     for (const chunk of chunks) {
       const payload = {
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-2.5-pro",
         messages: [
           {
             role: "system",
-            content: `You are a professional UI translator. Translate each English string to ${targetName || target} (language code: ${target}). Keep punctuation, emojis, numbers, and placeholders like {name} or %s exactly as-is. Reply ONLY with a JSON array of strings of the same length and order. No prose, no markdown fences.`,
+            content: `You are an expert professional translator for software UI. Translate every English string in the JSON array into natural, idiomatic ${targetName || target} (ISO code: ${target}). 
+Rules:
+- Use the most natural, native phrasing — NOT literal word-by-word translation.
+- Preserve all punctuation, emojis, numbers, units, and placeholders like {name}, %s, %d, $1 exactly.
+- Keep brand/product names ("Harvest IQ", "CropRover") untranslated.
+- Keep the same length tone (short labels stay short).
+- Reply with ONLY a JSON array of translated strings, same length and order. No prose, no markdown fences, no explanation.`,
           },
           { role: "user", content: JSON.stringify(chunk) },
         ],
@@ -50,7 +55,6 @@ Deno.serve(async (req) => {
       if (!r.ok) {
         const text = await r.text();
         console.error("AI gateway error", r.status, text);
-        // fallback: original strings
         translations.push(...chunk);
         continue;
       }
