@@ -39,9 +39,7 @@ const persistCache = (lang: string) => {
   } catch {}
 };
 
-// Originals keyed by Text node (so we can restore on language switch)
 const originals = new WeakMap<Text, string>();
-const translatedNodes = new WeakSet<Text>();
 
 const SKIP_TAGS = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "CODE", "PRE", "TEXTAREA"]);
 
@@ -50,7 +48,6 @@ const isTranslatable = (node: Text): boolean => {
   if (!t) return false;
   const trimmed = t.trim();
   if (!trimmed) return false;
-  // Skip pure numbers / symbols
   if (!/[a-zA-Z]/.test(trimmed)) return false;
   let p: Node | null = node.parentNode;
   while (p && p.nodeType === 1) {
@@ -80,13 +77,52 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
 
   const pendingRef = useRef<Set<string>>(new Set());
   const flushTimer = useRef<number | null>(null);
+  const isApplyingRef = useRef(false);
 
   const setLang = useCallback((l: string) => {
     localStorage.setItem(STORAGE_LANG, l);
     setLangState(l);
   }, []);
 
-  // Translate a batch of strings via edge function, fill cache, then re-apply DOM
+  // Apply only cached translations synchronously — no async work, no flicker.
+  const applyCachedOnly = useCallback((root: Node = document.body) => {
+    const target = langRef.current;
+    document.documentElement.lang = target;
+    document.documentElement.dir = RTL_LANGS.has(target) ? "rtl" : "ltr";
+
+    const nodes = collectTextNodes(root);
+
+    if (target === "en") {
+      isApplyingRef.current = true;
+      for (const n of nodes) {
+        const o = originals.get(n);
+        if (o !== undefined && n.nodeValue !== o) n.nodeValue = o;
+      }
+      isApplyingRef.current = false;
+      return;
+    }
+
+    const cache = loadCache(target);
+    isApplyingRef.current = true;
+    for (const n of nodes) {
+      let orig = originals.get(n);
+      if (orig === undefined) {
+        orig = n.nodeValue || "";
+        originals.set(n, orig);
+      }
+      const key = orig.trim();
+      if (!key) continue;
+      const cached = cache.get(key);
+      if (cached !== undefined && cached !== "") {
+        const replaced = (orig as string).replace(key, cached);
+        if (n.nodeValue !== replaced) n.nodeValue = replaced;
+      } else {
+        if (!pendingRef.current.has(key)) pendingRef.current.add(key);
+      }
+    }
+    isApplyingRef.current = false;
+  }, []);
+
   const translateBatch = useCallback(async (targetLang: string, items: string[]) => {
     if (items.length === 0) return;
     const cache = loadCache(targetLang);
@@ -98,85 +134,48 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
       const translations: string[] = data?.translations || [];
       items.forEach((src, i) => { cache.set(src, translations[i] ?? src); });
       persistCache(targetLang);
-      applyTranslations();
+      applyCachedOnly();
     } catch (e) {
-      // mark as identity so we don't keep retrying
       items.forEach((src) => { if (!cache.has(src)) cache.set(src, src); });
       persistCache(targetLang);
     }
-  }, []);
+  }, [applyCachedOnly]);
 
   const queueFlush = useCallback((targetLang: string) => {
     if (flushTimer.current) window.clearTimeout(flushTimer.current);
     flushTimer.current = window.setTimeout(() => {
+      flushTimer.current = null;
       const items = Array.from(pendingRef.current);
       pendingRef.current.clear();
       translateBatch(targetLang, items);
-    }, 250);
+    }, 200);
   }, [translateBatch]);
-
-  const applyTranslations = useCallback(() => {
-    const target = langRef.current;
-    document.documentElement.lang = target;
-    document.documentElement.dir = RTL_LANGS.has(target) ? "rtl" : "ltr";
-
-    const nodes = collectTextNodes(document.body);
-
-    if (target === "en") {
-      // restore originals
-      for (const n of nodes) {
-        const o = originals.get(n);
-        if (o !== undefined && n.nodeValue !== o) n.nodeValue = o;
-        translatedNodes.delete(n);
-      }
-      return;
-    }
-
-    const cache = loadCache(target);
-    const missing: string[] = [];
-
-    for (const n of nodes) {
-      let orig = originals.get(n);
-      if (orig === undefined) {
-        orig = n.nodeValue || "";
-        originals.set(n, orig);
-      }
-      const key = orig.trim();
-      if (!key) continue;
-      const cached = cache.get(key);
-      if (cached !== undefined) {
-        const replaced = (orig as string).replace(key, cached);
-        if (n.nodeValue !== replaced) n.nodeValue = replaced;
-        translatedNodes.add(n);
-      } else {
-        if (!pendingRef.current.has(key)) pendingRef.current.add(key);
-      }
-    }
-
-    if (pendingRef.current.size > 0) queueFlush(target);
-  }, [queueFlush]);
 
   // Re-apply when language changes
   useEffect(() => {
-    applyTranslations();
-  }, [lang, applyTranslations]);
+    applyCachedOnly();
+    if (pendingRef.current.size > 0) queueFlush(lang);
+  }, [lang, applyCachedOnly, queueFlush]);
 
-  // Mutation observer for dynamic content
+  // Mutation observer — apply cached translations IMMEDIATELY (sync) on any DOM change.
+  // This eliminates the English flash on route changes.
   useEffect(() => {
     const observer = new MutationObserver((mutations) => {
-      // Quick check: only run if anything new with text
-      let interesting = false;
+      if (isApplyingRef.current) return;
+      let hasNewNodes = false;
       for (const m of mutations) {
-        if (m.type === "characterData" || m.addedNodes.length > 0) { interesting = true; break; }
+        if (m.addedNodes.length > 0 || m.type === "characterData") {
+          hasNewNodes = true;
+          break;
+        }
       }
-      if (!interesting) return;
-      // Throttle
-      if (flushTimer.current) return;
-      window.setTimeout(() => applyTranslations(), 100);
+      if (!hasNewNodes) return;
+      applyCachedOnly();
+      if (pendingRef.current.size > 0) queueFlush(langRef.current);
     });
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
     return () => observer.disconnect();
-  }, [applyTranslations]);
+  }, [applyCachedOnly, queueFlush]);
 
   return (
     <LanguageContext.Provider value={{ lang, setLang }}>
