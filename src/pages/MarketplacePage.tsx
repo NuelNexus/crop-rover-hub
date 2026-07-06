@@ -457,51 +457,120 @@ const MarketplacePage = () => {
       )}
 
       {showAdd && (
-        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 relative ${sakuraActive ? "bg-foreground/50 backdrop-blur-sm" : "bg-foreground/40"}`} onClick={() => setShowAdd(false)}>
-          <div className="bg-background rounded-2xl p-6 w-full max-w-2xl space-y-3 animate-scale-in relative overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="relative z-10 space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-display text-xl font-bold">List a new product</h3>
-                <button onClick={() => setShowAdd(false)}><X className="w-5 h-5" /></button>
+        <div
+          className="fixed inset-0 z-50 bg-foreground/60 backdrop-blur-sm flex items-start sm:items-center justify-center p-4 overflow-y-auto animate-fade-in"
+          onClick={() => setShowAdd(false)}
+        >
+          <div
+            className="bg-card border border-border rounded-3xl w-full max-w-3xl my-8 shadow-2xl animate-scale-in overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative px-8 py-6 bg-gradient-to-br from-primary/15 via-success/10 to-warning/10 border-b border-border">
+              <button
+                onClick={() => setShowAdd(false)}
+                className="absolute top-4 right-4 p-2 rounded-full hover:bg-background/60 transition"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center">
+                  <Sprout className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-display text-2xl font-extrabold tracking-tight">List a new product</h3>
+                  <p className="text-sm text-muted-foreground">Share your harvest with the Harvest IQ community</p>
+                </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Product name" className="px-3 py-2 rounded-xl border border-border bg-background text-sm" />
-                <input value={form.seller} onChange={e => setForm({ ...form, seller: e.target.value })} placeholder="Seller / farm name" className="px-3 py-2 rounded-xl border border-border bg-background text-sm" />
-                <div className="flex gap-2">
-                  <input type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} placeholder="Price" className="flex-1 px-3 py-2 rounded-xl border border-border bg-background text-sm" />
-                  <select value={form.price_unit} onChange={e => setForm({ ...form, price_unit: e.target.value })} className="px-3 py-2 rounded-xl border border-border bg-background text-sm">
-                    <option value="ton">/ton</option><option value="bag">/bag</option><option value="kit">/kit</option><option value="pcs">/pcs</option><option value="kg">/kg</option>
+            </div>
+
+            <div className="px-8 py-6 space-y-5 max-h-[70vh] overflow-y-auto">
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 block">Product photo</label>
+                <div className="flex items-center gap-4">
+                  <label className="w-28 h-28 rounded-2xl border-2 border-dashed border-border hover:border-primary hover:bg-primary/5 transition cursor-pointer flex items-center justify-center overflow-hidden bg-secondary/40 shrink-0">
+                    {imagePreview ? (
+                      <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                    ) : form.image_url ? (
+                      <img src={form.image_url} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="text-center px-2">
+                        <Plus className="w-5 h-5 mx-auto text-muted-foreground" />
+                        <span className="text-[10px] text-muted-foreground block mt-1">Upload</span>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                      className="hidden"
+                    />
+                  </label>
+                  <div className="flex-1 space-y-2">
+                    <input
+                      value={form.image_url}
+                      onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+                      placeholder="Or paste an image URL"
+                      className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                    <p className="text-xs text-muted-foreground">PNG or JPG, up to 5MB.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block">Product name</label>
+                  <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Organic Tomatoes" className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block">Seller / farm</label>
+                  <input value={form.seller} onChange={e => setForm({ ...form, seller: e.target.value })} placeholder="Your farm name" className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block">Price</label>
+                  <div className="flex gap-2">
+                    <input type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} placeholder="0.00" className="flex-1 px-3 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                    <select value={form.price_unit} onChange={e => setForm({ ...form, price_unit: e.target.value })} className="px-3 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+                      <option value="ton">/ton</option><option value="bag">/bag</option><option value="kit">/kit</option><option value="pcs">/pcs</option><option value="kg">/kg</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block">Category</label>
+                  <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+                    <option>Produce</option><option>Seeds</option><option>Supplies</option><option>Equipment</option>
                   </select>
                 </div>
-                <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="px-3 py-2 rounded-xl border border-border bg-background text-sm">
-                  <option>Produce</option><option>Seeds</option><option>Supplies</option><option>Equipment</option>
-                </select>
-                <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                    className="px-3 py-2 rounded-xl border border-border bg-background text-sm"
-                  />
-                  <input
-                    value={form.image_url}
-                    onChange={(e) => setForm({ ...form, image_url: e.target.value })}
-                    placeholder="Or paste image URL"
-                    className="px-3 py-2 rounded-xl border border-border bg-background text-sm"
-                  />
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block">Stock status</label>
+                  <select value={form.stock_status} onChange={e => setForm({ ...form, stock_status: e.target.value })} className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+                    <option>In Stock</option><option>Limited</option><option>Out of Stock</option>
+                  </select>
                 </div>
-                {imagePreview && (
-                  <div className="sm:col-span-2">
-                    <img src={imagePreview} alt="Preview" className="h-28 rounded-xl border border-border object-cover" />
-                  </div>
-                )}
-                <select value={form.stock_status} onChange={e => setForm({ ...form, stock_status: e.target.value })} className="px-3 py-2 rounded-xl border border-border bg-background text-sm">
-                  <option>In Stock</option><option>Limited</option><option>Out of Stock</option>
-                </select>
-                <input type="number" step="0.1" min="0" max="5" value={form.rating} onChange={e => setForm({ ...form, rating: Number(e.target.value) })} placeholder="Rating (0-5)" className="px-3 py-2 rounded-xl border border-border bg-background text-sm" />
-                <input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Description" className="sm:col-span-2 px-3 py-2 rounded-xl border border-border bg-background text-sm" />
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block">Rating (0-5)</label>
+                  <input type="number" step="0.1" min="0" max="5" value={form.rating} onChange={e => setForm({ ...form, rating: Number(e.target.value) })} placeholder="0" className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block">Description</label>
+                  <textarea rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Tell buyers about freshness, variety, harvest date…" className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
+                </div>
               </div>
-              <button onClick={handleAdd} disabled={addProduct.isPending} className="w-full bg-primary text-primary-foreground py-3 rounded-xl text-sm font-bold uppercase tracking-wide hover:opacity-90 disabled:opacity-60">
+            </div>
+
+            <div className="px-8 py-4 border-t border-border bg-secondary/30 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setShowAdd(false)}
+                className="px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-background transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAdd}
+                disabled={addProduct.isPending || !form.name.trim() || !form.price || !form.seller.trim()}
+                className="px-6 py-2.5 rounded-xl text-sm font-bold uppercase tracking-wide bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
                 {addProduct.isPending ? "Listing…" : "Publish listing"}
               </button>
             </div>
