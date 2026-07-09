@@ -421,26 +421,41 @@ export type Database = {
       }
       profiles: {
         Row: {
+          accent_color: string | null
           avatar_url: string | null
+          banner_url: string | null
+          bio: string | null
           created_at: string
           display_name: string | null
+          farm_name: string | null
           id: string
+          location: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          accent_color?: string | null
           avatar_url?: string | null
+          banner_url?: string | null
+          bio?: string | null
           created_at?: string
           display_name?: string | null
+          farm_name?: string | null
           id?: string
+          location?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          accent_color?: string | null
           avatar_url?: string | null
+          banner_url?: string | null
+          bio?: string | null
           created_at?: string
           display_name?: string | null
+          farm_name?: string | null
           id?: string
+          location?: string | null
           updated_at?: string
           user_id?: string
         }
