@@ -51,14 +51,7 @@ const TopBar = () => {
   return (
     <header className="flex items-center justify-between px-6 py-4 bg-card border-b border-border lg:px-8">
       <div className="flex items-center gap-3 flex-1 max-w-md ml-10 lg:ml-0">
-        <div className="flex items-center gap-2 bg-secondary rounded-xl px-4 py-2.5 w-full">
-          <Search className="w-4 h-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search any of content"
-            className="bg-transparent outline-none text-sm w-full placeholder:text-muted-foreground"
-          />
-        </div>
+        <GlobalSearch />
       </div>
       <div className="flex items-center gap-3">
         {/* Notifications */}
