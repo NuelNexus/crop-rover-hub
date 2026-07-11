@@ -168,3 +168,175 @@ const TopBar = () => {
 };
 
 export default TopBar;
+
+type SearchResult = {
+  id: string;
+  kind: "product" | "user" | "crop" | "note";
+  title: string;
+  subtitle?: string;
+  to: string;
+  icon: JSX.Element;
+};
+
+function GlobalSearch() {
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  useEffect(() => {
+    const term = q.trim();
+    if (term.length < 2) {
+      setResults([]);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    const timer = setTimeout(async () => {
+      const like = `%${term}%`;
+      try {
+        const [prod, users, crops, notes] = await Promise.all([
+          supabase
+            .from("marketplace_products")
+            .select("id, name, category, price, unit")
+            .or(`name.ilike.${like},description.ilike.${like},category.ilike.${like}`)
+            .limit(6),
+          supabase
+            .from("profiles")
+            .select("user_id, display_name, farm_name")
+            .or(`display_name.ilike.${like},farm_name.ilike.${like}`)
+            .limit(6),
+          supabase
+            .from("crops")
+            .select("id, name, stage, category")
+            .ilike("name", like)
+            .limit(5),
+          supabase
+            .from("farm_notes")
+            .select("id, title, content")
+            .or(`title.ilike.${like},content.ilike.${like}`)
+            .limit(4),
+        ]);
+
+        if (cancelled) return;
+        const merged: SearchResult[] = [];
+        (prod.data || []).forEach((p: any) =>
+          merged.push({
+            id: `p-${p.id}`,
+            kind: "product",
+            title: p.name,
+            subtitle: `${p.category || "Product"} · $${p.price}/${p.unit || "unit"}`,
+            to: "/marketplace",
+            icon: <Package className="w-4 h-4 text-primary" />,
+          })
+        );
+        (users.data || []).forEach((u: any) =>
+          merged.push({
+            id: `u-${u.user_id}`,
+            kind: "user",
+            title: u.display_name || "Farmer",
+            subtitle: u.farm_name || "Send a message",
+            to: `/messages?to=${u.user_id}`,
+            icon: <MessageSquare className="w-4 h-4 text-success" />,
+          })
+        );
+        (crops.data || []).forEach((c: any) =>
+          merged.push({
+            id: `c-${c.id}`,
+            kind: "crop",
+            title: c.name,
+            subtitle: `${c.category || "Crop"} · ${c.stage || ""}`,
+            to: "/crops",
+            icon: <Sprout className="w-4 h-4 text-success" />,
+          })
+        );
+        (notes.data || []).forEach((n: any) =>
+          merged.push({
+            id: `n-${n.id}`,
+            kind: "note",
+            title: n.title || "Note",
+            subtitle: (n.content || "").slice(0, 60),
+            to: "/harvesting",
+            icon: <Sprout className="w-4 h-4 text-muted-foreground" />,
+          })
+        );
+        setResults(merged);
+      } catch (e) {
+        console.error("search error", e);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [q]);
+
+  const go = (r: SearchResult) => {
+    setOpen(false);
+    setQ("");
+    navigate(r.to);
+  };
+
+  return (
+    <div ref={wrapRef} className="relative w-full">
+      <div className="flex items-center gap-2 bg-secondary rounded-xl px-4 py-2.5 w-full">
+        <Search className="w-4 h-4 text-muted-foreground" />
+        <input
+          type="text"
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          placeholder="Search products, users, crops…"
+          className="bg-transparent outline-none text-sm w-full placeholder:text-muted-foreground"
+        />
+        {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+      </div>
+      {open && q.trim().length >= 2 && (
+        <div className="absolute top-full left-0 right-0 mt-2 bg-popover border border-border rounded-xl shadow-xl overflow-hidden z-50 max-h-96 overflow-y-auto">
+          {results.length === 0 && !loading ? (
+            <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+              No results for "{q}"
+            </div>
+          ) : (
+            results.map((r) => (
+              <button
+                key={r.id}
+                onClick={() => go(r)}
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-secondary transition text-left border-b border-border last:border-0"
+              >
+                <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center shrink-0">
+                  {r.icon}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{r.title}</p>
+                  {r.subtitle && (
+                    <p className="text-xs text-muted-foreground truncate">{r.subtitle}</p>
+                  )}
+                </div>
+                <span className="text-[10px] uppercase text-muted-foreground tracking-wide">
+                  {r.kind}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
