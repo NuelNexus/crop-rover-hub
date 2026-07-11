@@ -21,34 +21,35 @@ Deno.serve(async (req) => {
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ error: 'LOVABLE_API_KEY not configured' }), {
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+    if (!GEMINI_API_KEY) {
+      return new Response(JSON.stringify({ error: 'GEMINI_API_KEY not configured' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Try models in order of reliability/availability
-    const models = [
-      'google/gemini-3-flash-preview',
-      'google/gemini-2.5-flash',
-      'google/gemini-2.5-flash-lite',
-    ];
+    const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
 
     let lastError = '';
     let lastStatus = 500;
 
     for (const model of models) {
-      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: 'system', content: systemPrompt }, ...messages],
-          stream: true,
-        }),
-      });
+      const response = await fetch(
+        'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${GEMINI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model,
+            messages: [{ role: 'system', content: systemPrompt }, ...messages],
+            stream: true,
+          }),
+        }
+      );
 
       if (response.ok) {
         return new Response(response.body, {
@@ -58,12 +59,10 @@ Deno.serve(async (req) => {
 
       lastError = await response.text().catch(() => '');
       lastStatus = response.status;
-      // If rate-limited or unavailable, try next model
       if (response.status === 429 || response.status === 503) {
         console.warn(`Model ${model} returned ${response.status}, trying next...`);
         continue;
       }
-      // Other errors: don't retry
       break;
     }
 
@@ -74,10 +73,7 @@ Deno.serve(async (req) => {
             ? 'AI is busy right now — please try again in a moment.'
             : lastError || 'AI request failed',
       }),
-      {
-        status: lastStatus,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      { status: lastStatus, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (e) {
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }), {

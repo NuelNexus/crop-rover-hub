@@ -1,6 +1,16 @@
+// Gemini-based speech-to-text using inline audio in generateContent.
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+const encodeBase64 = (bytes: Uint8Array) => {
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
 };
 
 Deno.serve(async (req) => {
@@ -21,18 +31,35 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY missing");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY missing");
 
-    const upstream = new FormData();
-    upstream.append("model", "openai/gpt-4o-mini-transcribe");
-    upstream.append("file", file, file.name || "audio.webm");
+    const buf = new Uint8Array(await file.arrayBuffer());
+    const b64 = encodeBase64(buf);
+    // Map mime — Gemini accepts audio/webm, audio/mp4, audio/mpeg, audio/wav, audio/ogg.
+    let mime = file.type || "audio/webm";
+    if (mime === "audio/mp4") mime = "audio/mp4";
 
-    const r = await fetch("https://ai.gateway.lovable.dev/v1/audio/transcriptions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}` },
-      body: upstream,
-    });
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [
+                { text: "Transcribe the following audio verbatim. Return only the spoken words as plain text, no commentary, no quotes, no timestamps." },
+                { inline_data: { mime_type: mime, data: b64 } },
+              ],
+            },
+          ],
+          generationConfig: { temperature: 0 },
+        }),
+      }
+    );
+
     if (!r.ok) {
       const t = await r.text();
       return new Response(JSON.stringify({ error: t }), {
@@ -41,7 +68,8 @@ Deno.serve(async (req) => {
       });
     }
     const data = await r.json();
-    return new Response(JSON.stringify({ text: data.text || "" }), {
+    const text = data?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).filter(Boolean).join(" ").trim() || "";
+    return new Response(JSON.stringify({ text }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
