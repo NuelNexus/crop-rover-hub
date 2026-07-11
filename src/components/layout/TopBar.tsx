@@ -1,4 +1,4 @@
-import { Search, Bell, LogOut, Settings, User as UserIcon, CheckCheck } from "lucide-react";
+import { Search, Bell, LogOut, Settings, User as UserIcon, CheckCheck, Package, Sprout, MessageSquare, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAlerts, useMarkAlertRead } from "@/hooks/useAlerts";
 import {
@@ -9,6 +9,8 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { useEffect, useRef, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const getInitials = (name?: string | null, email?: string | null) => {
   const source = name?.trim() || email?.split("@")[0] || "";
