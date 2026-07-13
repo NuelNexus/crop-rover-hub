@@ -238,7 +238,22 @@ const ProfilePage = () => {
                     {profile?.location && (
                       <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" style={{ color: accent }} /> {profile.location}</span>
                     )}
+                    {profile?.website && (
+                      <a href={profile.website} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 hover:text-foreground">
+                        <Globe className="w-4 h-4" style={{ color: accent }} /> {profile.website.replace(/^https?:\/\//, "")}
+                      </a>
+                    )}
+                    {profile?.phone && (
+                      <span className="flex items-center gap-1.5"><Phone className="w-4 h-4" style={{ color: accent }} /> {profile.phone}</span>
+                    )}
                   </div>
+                  {profile?.specialties && profile.specialties.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {profile.specialties.map((s) => (
+                        <span key={s} className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ background: `${accent}22`, color: accent }}>{s}</span>
+                      ))}
+                    </div>
+                  )}
                   {profile?.bio && <p className="text-sm text-foreground/80 max-w-2xl">{profile.bio}</p>}
                 </>
               )}
