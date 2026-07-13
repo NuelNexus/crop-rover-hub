@@ -57,7 +57,14 @@ const ProfilePage = () => {
   };
 
   const handleSave = async () => {
-    await updateProfile.mutateAsync(form);
+    const { specialties, ...rest } = form;
+    await updateProfile.mutateAsync({
+      ...rest,
+      specialties: specialties
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    });
     setEditing(false);
   };
 
