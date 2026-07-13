@@ -13,6 +13,11 @@ export type Profile = {
   location: string | null;
   banner_url: string | null;
   accent_color: string | null;
+  website: string | null;
+  phone: string | null;
+  specialties: string[] | null;
+  social_links: Record<string, string> | null;
+  theme: string | null;
   created_at: string;
   updated_at: string;
 };
