@@ -25,6 +25,12 @@ const SettingsPage = () => {
       <div className="space-y-6 max-w-3xl">
         <h1 className="font-display text-2xl font-bold flex items-center gap-2"><Settings className="w-6 h-6" /> Settings</h1>
 
+        {/* Appearance */}
+        <div className="stat-card">
+          <ThemePicker />
+        </div>
+
+
         {/* Farm Profile */}
         <div className="stat-card space-y-4">
           <h2 className="font-display text-lg font-semibold flex items-center gap-2"><MapPin className="w-5 h-5" /> Farm Profile</h2>
