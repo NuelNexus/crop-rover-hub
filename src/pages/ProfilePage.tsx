@@ -3,7 +3,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile, useUpdateProfile, useUploadProfileImage } from "@/hooks/useProfile";
 import { useProducts, useDeleteProduct } from "@/hooks/useMarketplace";
-import { Camera, MapPin, Sprout, Edit3, Save, X, Trash2, Package, Palette } from "lucide-react";
+import { Camera, MapPin, Sprout, Edit3, Save, X, Trash2, Package, Palette, Globe, Phone, Tag } from "lucide-react";
 import { toast } from "sonner";
 
 const ACCENT_COLORS = ["#22c55e", "#0ea5e9", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316"];
@@ -23,6 +23,9 @@ const ProfilePage = () => {
     location: "",
     bio: "",
     accent_color: "#22c55e",
+    website: "",
+    phone: "",
+    specialties: "",
   });
 
   useEffect(() => {
@@ -33,6 +36,9 @@ const ProfilePage = () => {
         location: profile.location || "",
         bio: profile.bio || "",
         accent_color: profile.accent_color || "#22c55e",
+        website: profile.website || "",
+        phone: profile.phone || "",
+        specialties: (profile.specialties || []).join(", "),
       });
     }
   }, [profile]);
@@ -51,7 +57,14 @@ const ProfilePage = () => {
   };
 
   const handleSave = async () => {
-    await updateProfile.mutateAsync(form);
+    const { specialties, ...rest } = form;
+    await updateProfile.mutateAsync({
+      ...rest,
+      specialties: specialties
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    });
     setEditing(false);
   };
 
@@ -157,6 +170,36 @@ const ProfilePage = () => {
                     rows={3}
                     className="px-3 py-2 rounded-lg border border-border bg-background text-sm md:col-span-2 resize-none"
                   />
+                  <div className="md:col-span-2 grid md:grid-cols-2 gap-3">
+                    <div className="relative">
+                      <Globe className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <input
+                        value={form.website}
+                        onChange={(e) => setForm({ ...form, website: e.target.value })}
+                        placeholder="https://your-farm.com"
+                        className="w-full pl-8 pr-3 py-2 rounded-lg border border-border bg-background text-sm"
+                      />
+                    </div>
+                    <div className="relative">
+                      <Phone className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <input
+                        value={form.phone}
+                        onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                        placeholder="Phone number"
+                        className="w-full pl-8 pr-3 py-2 rounded-lg border border-border bg-background text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div className="md:col-span-2 relative">
+                    <Tag className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      value={form.specialties}
+                      onChange={(e) => setForm({ ...form, specialties: e.target.value })}
+                      placeholder="Specialties (comma separated e.g. Organic, Heirloom, Livestock)"
+                      className="w-full pl-8 pr-3 py-2 rounded-lg border border-border bg-background text-sm"
+                    />
+                  </div>
+
                   <div className="md:col-span-2">
                     <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 mb-2">
                       <Palette className="w-3.5 h-3.5" /> ACCENT COLOR
@@ -195,7 +238,22 @@ const ProfilePage = () => {
                     {profile?.location && (
                       <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" style={{ color: accent }} /> {profile.location}</span>
                     )}
+                    {profile?.website && (
+                      <a href={profile.website} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 hover:text-foreground">
+                        <Globe className="w-4 h-4" style={{ color: accent }} /> {profile.website.replace(/^https?:\/\//, "")}
+                      </a>
+                    )}
+                    {profile?.phone && (
+                      <span className="flex items-center gap-1.5"><Phone className="w-4 h-4" style={{ color: accent }} /> {profile.phone}</span>
+                    )}
                   </div>
+                  {profile?.specialties && profile.specialties.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {profile.specialties.map((s) => (
+                        <span key={s} className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ background: `${accent}22`, color: accent }}>{s}</span>
+                      ))}
+                    </div>
+                  )}
                   {profile?.bio && <p className="text-sm text-foreground/80 max-w-2xl">{profile.bio}</p>}
                 </>
               )}

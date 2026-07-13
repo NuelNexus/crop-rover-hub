@@ -11,6 +11,8 @@ import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import UserProfileModal from "@/components/search/UserProfileModal";
+import ProductModal from "@/components/search/ProductModal";
 
 const getInitials = (name?: string | null, email?: string | null) => {
   const source = name?.trim() || email?.split("@")[0] || "";
@@ -172,9 +174,10 @@ export default TopBar;
 type SearchResult = {
   id: string;
   kind: "product" | "user" | "crop" | "note";
+  refId: string;
   title: string;
   subtitle?: string;
-  to: string;
+  to?: string;
   icon: JSX.Element;
 };
 
@@ -183,6 +186,8 @@ function GlobalSearch() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [userModal, setUserModal] = useState<string | null>(null);
+  const [productModal, setProductModal] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -209,13 +214,13 @@ function GlobalSearch() {
         const [prod, users, crops, notes] = await Promise.all([
           supabase
             .from("marketplace_products")
-            .select("id, name, category, price, unit")
+            .select("id, name, category, price, price_unit")
             .or(`name.ilike.${like},description.ilike.${like},category.ilike.${like}`)
             .limit(6),
           supabase
             .from("profiles")
-            .select("user_id, display_name, farm_name")
-            .or(`display_name.ilike.${like},farm_name.ilike.${like}`)
+            .select("user_id, display_name, farm_name, location")
+            .or(`display_name.ilike.${like},farm_name.ilike.${like},location.ilike.${like}`)
             .limit(6),
           supabase
             .from("crops")
@@ -231,30 +236,31 @@ function GlobalSearch() {
 
         if (cancelled) return;
         const merged: SearchResult[] = [];
-        (prod.data || []).forEach((p: any) =>
-          merged.push({
-            id: `p-${p.id}`,
-            kind: "product",
-            title: p.name,
-            subtitle: `${p.category || "Product"} · $${p.price}/${p.unit || "unit"}`,
-            to: "/marketplace",
-            icon: <Package className="w-4 h-4 text-primary" />,
-          })
-        );
         (users.data || []).forEach((u: any) =>
           merged.push({
             id: `u-${u.user_id}`,
             kind: "user",
+            refId: u.user_id,
             title: u.display_name || "Farmer",
-            subtitle: u.farm_name || "Send a message",
-            to: `/messages?to=${u.user_id}`,
-            icon: <MessageSquare className="w-4 h-4 text-success" />,
+            subtitle: [u.farm_name, u.location].filter(Boolean).join(" · ") || "View profile",
+            icon: <UserIcon className="w-4 h-4 text-primary" />,
+          })
+        );
+        (prod.data || []).forEach((p: any) =>
+          merged.push({
+            id: `p-${p.id}`,
+            kind: "product",
+            refId: p.id,
+            title: p.name,
+            subtitle: `${p.category || "Product"} · $${p.price}/${p.price_unit || "unit"}`,
+            icon: <Package className="w-4 h-4 text-accent" />,
           })
         );
         (crops.data || []).forEach((c: any) =>
           merged.push({
             id: `c-${c.id}`,
             kind: "crop",
+            refId: c.id,
             title: c.name,
             subtitle: `${c.category || "Crop"} · ${c.stage || ""}`,
             to: "/crops",
@@ -265,10 +271,11 @@ function GlobalSearch() {
           merged.push({
             id: `n-${n.id}`,
             kind: "note",
+            refId: n.id,
             title: n.title || "Note",
             subtitle: (n.content || "").slice(0, 60),
             to: "/harvesting",
-            icon: <Sprout className="w-4 h-4 text-muted-foreground" />,
+            icon: <MessageSquare className="w-4 h-4 text-muted-foreground" />,
           })
         );
         setResults(merged);
@@ -287,56 +294,62 @@ function GlobalSearch() {
   const go = (r: SearchResult) => {
     setOpen(false);
     setQ("");
-    navigate(r.to);
+    if (r.kind === "user") setUserModal(r.refId);
+    else if (r.kind === "product") setProductModal(r.refId);
+    else if (r.to) navigate(r.to);
   };
 
   return (
-    <div ref={wrapRef} className="relative w-full">
-      <div className="flex items-center gap-2 bg-secondary rounded-xl px-4 py-2.5 w-full">
-        <Search className="w-4 h-4 text-muted-foreground" />
-        <input
-          type="text"
-          value={q}
-          onChange={(e) => {
-            setQ(e.target.value);
-            setOpen(true);
-          }}
-          onFocus={() => setOpen(true)}
-          placeholder="Search products, users, crops…"
-          className="bg-transparent outline-none text-sm w-full placeholder:text-muted-foreground"
-        />
-        {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
-      </div>
-      {open && q.trim().length >= 2 && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-popover border border-border rounded-xl shadow-xl overflow-hidden z-50 max-h-96 overflow-y-auto">
-          {results.length === 0 && !loading ? (
-            <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-              No results for "{q}"
-            </div>
-          ) : (
-            results.map((r) => (
-              <button
-                key={r.id}
-                onClick={() => go(r)}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-secondary transition text-left border-b border-border last:border-0"
-              >
-                <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center shrink-0">
-                  {r.icon}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate">{r.title}</p>
-                  {r.subtitle && (
-                    <p className="text-xs text-muted-foreground truncate">{r.subtitle}</p>
-                  )}
-                </div>
-                <span className="text-[10px] uppercase text-muted-foreground tracking-wide">
-                  {r.kind}
-                </span>
-              </button>
-            ))
-          )}
+    <>
+      <div ref={wrapRef} className="relative w-full">
+        <div className="flex items-center gap-2 bg-secondary rounded-xl px-4 py-2.5 w-full">
+          <Search className="w-4 h-4 text-muted-foreground" />
+          <input
+            type="text"
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setOpen(true);
+            }}
+            onFocus={() => setOpen(true)}
+            placeholder="Search users, products, crops…"
+            className="bg-transparent outline-none text-sm w-full placeholder:text-muted-foreground"
+          />
+          {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
         </div>
-      )}
-    </div>
+        {open && q.trim().length >= 2 && (
+          <div className="absolute top-full left-0 right-0 mt-2 bg-popover border border-border rounded-xl shadow-xl overflow-hidden z-50 max-h-96 overflow-y-auto">
+            {results.length === 0 && !loading ? (
+              <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                No results for "{q}"
+              </div>
+            ) : (
+              results.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => go(r)}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-secondary transition text-left border-b border-border last:border-0"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center shrink-0">
+                    {r.icon}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{r.title}</p>
+                    {r.subtitle && (
+                      <p className="text-xs text-muted-foreground truncate">{r.subtitle}</p>
+                    )}
+                  </div>
+                  <span className="text-[10px] uppercase text-muted-foreground tracking-wide">
+                    {r.kind}
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+      <UserProfileModal userId={userModal} onOpenChange={(o) => !o && setUserModal(null)} />
+      <ProductModal productId={productModal} onOpenChange={(o) => !o && setProductModal(null)} />
+    </>
   );
 }

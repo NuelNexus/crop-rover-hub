@@ -1,0 +1,7 @@
+
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS website TEXT,
+  ADD COLUMN IF NOT EXISTS phone TEXT,
+  ADD COLUMN IF NOT EXISTS specialties TEXT[] DEFAULT '{}'::text[],
+  ADD COLUMN IF NOT EXISTS social_links JSONB DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS theme TEXT DEFAULT 'harvest';
