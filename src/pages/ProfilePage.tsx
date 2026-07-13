@@ -23,6 +23,9 @@ const ProfilePage = () => {
     location: "",
     bio: "",
     accent_color: "#22c55e",
+    website: "",
+    phone: "",
+    specialties: "",
   });
 
   useEffect(() => {
@@ -33,6 +36,9 @@ const ProfilePage = () => {
         location: profile.location || "",
         bio: profile.bio || "",
         accent_color: profile.accent_color || "#22c55e",
+        website: profile.website || "",
+        phone: profile.phone || "",
+        specialties: (profile.specialties || []).join(", "),
       });
     }
   }, [profile]);
