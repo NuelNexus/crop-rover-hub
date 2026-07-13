@@ -3,7 +3,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile, useUpdateProfile, useUploadProfileImage } from "@/hooks/useProfile";
 import { useProducts, useDeleteProduct } from "@/hooks/useMarketplace";
-import { Camera, MapPin, Sprout, Edit3, Save, X, Trash2, Package, Palette } from "lucide-react";
+import { Camera, MapPin, Sprout, Edit3, Save, X, Trash2, Package, Palette, Globe, Phone, Tag } from "lucide-react";
 import { toast } from "sonner";
 
 const ACCENT_COLORS = ["#22c55e", "#0ea5e9", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316"];
