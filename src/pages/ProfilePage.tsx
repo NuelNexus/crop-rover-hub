@@ -170,6 +170,36 @@ const ProfilePage = () => {
                     rows={3}
                     className="px-3 py-2 rounded-lg border border-border bg-background text-sm md:col-span-2 resize-none"
                   />
+                  <div className="md:col-span-2 grid md:grid-cols-2 gap-3">
+                    <div className="relative">
+                      <Globe className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <input
+                        value={form.website}
+                        onChange={(e) => setForm({ ...form, website: e.target.value })}
+                        placeholder="https://your-farm.com"
+                        className="w-full pl-8 pr-3 py-2 rounded-lg border border-border bg-background text-sm"
+                      />
+                    </div>
+                    <div className="relative">
+                      <Phone className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <input
+                        value={form.phone}
+                        onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                        placeholder="Phone number"
+                        className="w-full pl-8 pr-3 py-2 rounded-lg border border-border bg-background text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div className="md:col-span-2 relative">
+                    <Tag className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      value={form.specialties}
+                      onChange={(e) => setForm({ ...form, specialties: e.target.value })}
+                      placeholder="Specialties (comma separated e.g. Organic, Heirloom, Livestock)"
+                      className="w-full pl-8 pr-3 py-2 rounded-lg border border-border bg-background text-sm"
+                    />
+                  </div>
+
                   <div className="md:col-span-2">
                     <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 mb-2">
                       <Palette className="w-3.5 h-3.5" /> ACCENT COLOR
