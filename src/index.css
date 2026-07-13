@@ -303,7 +303,6 @@
     --success: 145 80% 50%;
     --warning: 45 100% 55%;
   }
-}
 
 @layer base {
   * {
