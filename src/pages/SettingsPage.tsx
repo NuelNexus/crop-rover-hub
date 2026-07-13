@@ -2,6 +2,7 @@ import { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Settings, Bell, MapPin, Thermometer, Droplets, Shield } from "lucide-react";
 import { toast } from "sonner";
+import ThemePicker from "@/components/settings/ThemePicker";
 
 const SettingsPage = () => {
   const [settings, setSettings] = useState({
