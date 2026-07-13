@@ -430,8 +430,13 @@ export type Database = {
           farm_name: string | null
           id: string
           location: string | null
+          phone: string | null
+          social_links: Json | null
+          specialties: string[] | null
+          theme: string | null
           updated_at: string
           user_id: string
+          website: string | null
         }
         Insert: {
           accent_color?: string | null
@@ -443,8 +448,13 @@ export type Database = {
           farm_name?: string | null
           id?: string
           location?: string | null
+          phone?: string | null
+          social_links?: Json | null
+          specialties?: string[] | null
+          theme?: string | null
           updated_at?: string
           user_id: string
+          website?: string | null
         }
         Update: {
           accent_color?: string | null
@@ -456,8 +466,13 @@ export type Database = {
           farm_name?: string | null
           id?: string
           location?: string | null
+          phone?: string | null
+          social_links?: Json | null
+          specialties?: string[] | null
+          theme?: string | null
           updated_at?: string
           user_id?: string
+          website?: string | null
         }
         Relationships: []
       }
