@@ -11,7 +11,6 @@ import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import UserProfileModal from "@/components/search/UserProfileModal";
 import ProductModal from "@/components/search/ProductModal";
 
 const getInitials = (name?: string | null, email?: string | null) => {
