@@ -11,7 +11,6 @@ import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import UserProfileModal from "@/components/search/UserProfileModal";
 import ProductModal from "@/components/search/ProductModal";
 
 const getInitials = (name?: string | null, email?: string | null) => {
@@ -186,7 +185,7 @@ function GlobalSearch() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [userModal, setUserModal] = useState<string | null>(null);
+  
   const [productModal, setProductModal] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -294,7 +293,7 @@ function GlobalSearch() {
   const go = (r: SearchResult) => {
     setOpen(false);
     setQ("");
-    if (r.kind === "user") setUserModal(r.refId);
+    if (r.kind === "user") navigate(`/profile/${r.refId}`);
     else if (r.kind === "product") setProductModal(r.refId);
     else if (r.to) navigate(r.to);
   };
@@ -348,7 +347,7 @@ function GlobalSearch() {
           </div>
         )}
       </div>
-      <UserProfileModal userId={userModal} onOpenChange={(o) => !o && setUserModal(null)} />
+      
       <ProductModal productId={productModal} onOpenChange={(o) => !o && setProductModal(null)} />
     </>
   );

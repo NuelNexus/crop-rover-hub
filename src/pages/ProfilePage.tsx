@@ -1,16 +1,21 @@
 import { useState, useEffect } from "react";
+import { useParams, Link } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile, useUpdateProfile, useUploadProfileImage } from "@/hooks/useProfile";
 import { useProducts, useDeleteProduct } from "@/hooks/useMarketplace";
-import { Camera, MapPin, Sprout, Edit3, Save, X, Trash2, Package, Palette, Globe, Phone, Tag } from "lucide-react";
+import { Camera, MapPin, Sprout, Edit3, Save, X, Trash2, Package, Palette, Globe, Phone, Tag, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 
 const ACCENT_COLORS = ["#22c55e", "#0ea5e9", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316"];
 
 const ProfilePage = () => {
   const { user } = useAuth();
-  const { data: profile, isLoading } = useProfile();
+  const { userId: routeUserId } = useParams<{ userId?: string }>();
+  const viewingUserId = routeUserId || user?.id;
+  const isOwn = !routeUserId || routeUserId === user?.id;
+
+  const { data: profile, isLoading } = useProfile(viewingUserId);
   const updateProfile = useUpdateProfile();
   const uploadImage = useUploadProfileImage();
   const { data: products } = useProducts();
@@ -41,13 +46,15 @@ const ProfilePage = () => {
         specialties: (profile.specialties || []).join(", "),
       });
     }
-  }, [profile]);
+    // Reset edit mode when navigating between profiles
+    setEditing(false);
+  }, [profile, viewingUserId]);
 
-  const myProducts = (products || []).filter((p) => p.user_id === user?.id);
-  const accent = form.accent_color || profile?.accent_color || "#22c55e";
+  const userProducts = (products || []).filter((p) => p.user_id === viewingUserId);
+  const accent = (isOwn ? form.accent_color : profile?.accent_color) || "#22c55e";
 
   const handleImage = async (kind: "avatar" | "banner", file: File | null) => {
-    if (!file) return;
+    if (!file || !isOwn) return;
     try {
       const url = await uploadImage.mutateAsync({ file, kind });
       await updateProfile.mutateAsync({ [kind === "avatar" ? "avatar_url" : "banner_url"]: url });
@@ -68,7 +75,7 @@ const ProfilePage = () => {
     setEditing(false);
   };
 
-  const initials = (form.display_name || user?.email || "?")
+  const initials = (profile?.display_name || form.display_name || (isOwn ? user?.email : "") || "?")
     .split(/[\s@._-]+/)
     .filter(Boolean)
     .slice(0, 2)
@@ -98,15 +105,17 @@ const ProfilePage = () => {
                 : `linear-gradient(135deg, ${accent}, ${accent}88)`,
             }}
           >
-            <label className="absolute top-3 right-3 bg-black/40 hover:bg-black/60 text-white rounded-full p-2 cursor-pointer backdrop-blur-sm transition">
-              <Camera className="w-4 h-4" />
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => handleImage("banner", e.target.files?.[0] || null)}
-              />
-            </label>
+            {isOwn && (
+              <label className="absolute top-3 right-3 bg-black/40 hover:bg-black/60 text-white rounded-full p-2 cursor-pointer backdrop-blur-sm transition">
+                <Camera className="w-4 h-4" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handleImage("banner", e.target.files?.[0] || null)}
+                />
+              </label>
+            )}
           </div>
 
           <div className="px-6 pb-6 pt-0 -mt-14 md:-mt-16">
@@ -122,28 +131,40 @@ const ProfilePage = () => {
                 >
                   {!profile?.avatar_url && initials}
                 </div>
-                <label className="absolute bottom-1 right-1 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full p-2 cursor-pointer shadow-md transition">
-                  <Camera className="w-3.5 h-3.5" />
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => handleImage("avatar", e.target.files?.[0] || null)}
-                  />
-                </label>
+                {isOwn && (
+                  <label className="absolute bottom-1 right-1 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full p-2 cursor-pointer shadow-md transition">
+                    <Camera className="w-3.5 h-3.5" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleImage("avatar", e.target.files?.[0] || null)}
+                    />
+                  </label>
+                )}
               </div>
 
-              <button
-                onClick={() => (editing ? handleSave() : setEditing(true))}
-                className="px-4 py-2 rounded-lg text-sm font-semibold text-white shadow-sm hover:opacity-90 transition flex items-center gap-2"
-                style={{ background: accent }}
-              >
-                {editing ? <><Save className="w-4 h-4" /> Save</> : <><Edit3 className="w-4 h-4" /> Edit Profile</>}
-              </button>
+              {isOwn ? (
+                <button
+                  onClick={() => (editing ? handleSave() : setEditing(true))}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold text-white shadow-sm hover:opacity-90 transition flex items-center gap-2"
+                  style={{ background: accent }}
+                >
+                  {editing ? <><Save className="w-4 h-4" /> Save</> : <><Edit3 className="w-4 h-4" /> Edit Profile</>}
+                </button>
+              ) : (
+                <Link
+                  to={`/messages?to=${viewingUserId}`}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold text-white shadow-sm hover:opacity-90 transition flex items-center gap-2"
+                  style={{ background: accent }}
+                >
+                  <MessageSquare className="w-4 h-4" /> Send Message
+                </Link>
+              )}
             </div>
 
             <div className="mt-4 space-y-3">
-              {editing ? (
+              {editing && isOwn ? (
                 <div className="grid md:grid-cols-2 gap-3">
                   <input
                     value={form.display_name}
@@ -229,7 +250,7 @@ const ProfilePage = () => {
                 <>
                   <div>
                     <h1 className="text-2xl font-bold">{profile?.display_name || "Unnamed Farmer"}</h1>
-                    <p className="text-sm text-muted-foreground">{user?.email}</p>
+                    {isOwn && <p className="text-sm text-muted-foreground">{user?.email}</p>}
                   </div>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
                     {profile?.farm_name && (
@@ -264,9 +285,9 @@ const ProfilePage = () => {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4">
           {[
-            { label: "Listings", value: myProducts.length },
-            { label: "In Stock", value: myProducts.filter((p) => p.stock_status === "In Stock").length },
-            { label: "Categories", value: new Set(myProducts.map((p) => p.category).filter(Boolean)).size },
+            { label: "Listings", value: userProducts.length },
+            { label: "In Stock", value: userProducts.filter((p) => p.stock_status === "In Stock").length },
+            { label: "Categories", value: new Set(userProducts.map((p) => p.category).filter(Boolean)).size },
           ].map((s) => (
             <div key={s.label} className="bg-card border border-border rounded-xl p-4 text-center">
               <div className="text-2xl font-bold" style={{ color: accent }}>{s.value}</div>
@@ -275,27 +296,29 @@ const ProfilePage = () => {
           ))}
         </div>
 
-        {/* My marketplace listings */}
+        {/* Marketplace listings */}
         <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Package className="w-5 h-5" style={{ color: accent }} />
-              <h2 className="text-lg font-bold">My Marketplace Listings</h2>
+              <h2 className="text-lg font-bold">{isOwn ? "My Marketplace Listings" : "Marketplace Listings"}</h2>
             </div>
-            <span className="text-xs text-muted-foreground">{myProducts.length} total</span>
+            <span className="text-xs text-muted-foreground">{userProducts.length} total</span>
           </div>
 
-          {myProducts.length === 0 ? (
+          {userProducts.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
-              <p className="text-sm">You haven't listed any products yet.</p>
-              <a href="/marketplace" className="inline-block mt-3 text-sm font-semibold hover:underline" style={{ color: accent }}>
-                Go to Marketplace →
-              </a>
+              <p className="text-sm">{isOwn ? "You haven't listed any products yet." : "No listings yet."}</p>
+              {isOwn && (
+                <a href="/marketplace" className="inline-block mt-3 text-sm font-semibold hover:underline" style={{ color: accent }}>
+                  Go to Marketplace →
+                </a>
+              )}
             </div>
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {myProducts.map((p) => (
+              {userProducts.map((p) => (
                 <div key={p.id} className="border border-border rounded-xl overflow-hidden bg-background hover:shadow-md transition group">
                   <div
                     className="h-32 w-full"
@@ -311,14 +334,16 @@ const ProfilePage = () => {
                         <h3 className="font-semibold text-sm truncate">{p.name}</h3>
                         <p className="text-xs text-muted-foreground">{p.category}</p>
                       </div>
-                      <button
-                        onClick={() => {
-                          if (confirm(`Delete "${p.name}"?`)) deleteProduct.mutate(p.id);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-destructive/10 text-destructive transition"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {isOwn && (
+                        <button
+                          onClick={() => {
+                            if (confirm(`Delete "${p.name}"?`)) deleteProduct.mutate(p.id);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-destructive/10 text-destructive transition"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                     <div className="flex items-center justify-between mt-2">
                       <span className="text-sm font-bold" style={{ color: accent }}>
