@@ -347,7 +347,7 @@ function GlobalSearch() {
           </div>
         )}
       </div>
-      <UserProfileModal userId={userModal} onOpenChange={(o) => !o && setUserModal(null)} />
+      
       <ProductModal productId={productModal} onOpenChange={(o) => !o && setProductModal(null)} />
     </>
   );
