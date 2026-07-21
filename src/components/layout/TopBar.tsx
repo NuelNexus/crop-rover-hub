@@ -185,7 +185,7 @@ function GlobalSearch() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [userModal, setUserModal] = useState<string | null>(null);
+  
   const [productModal, setProductModal] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
