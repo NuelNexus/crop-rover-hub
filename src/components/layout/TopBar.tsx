@@ -293,7 +293,7 @@ function GlobalSearch() {
   const go = (r: SearchResult) => {
     setOpen(false);
     setQ("");
-    if (r.kind === "user") setUserModal(r.refId);
+    if (r.kind === "user") navigate(`/profile/${r.refId}`);
     else if (r.kind === "product") setProductModal(r.refId);
     else if (r.to) navigate(r.to);
   };
