@@ -25,20 +25,19 @@ type Props = {
 
 type Phase = "idle" | "listening" | "thinking" | "speaking";
 
-// Curated ElevenLabs voices (all multilingual)
+// Curated voices (all multilingual)
 const VOICES = [
-  { id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah — warm female" },
-  { id: "9BWtsMINqrJLrRacOk9x", name: "Aria — expressive female" },
-  { id: "XB0fDUnXU5powFXDhCwa", name: "Charlotte — soft female" },
-  { id: "XrExE9yKIg1WjnnlVkGX", name: "Matilda — friendly female" },
-  { id: "cgSgspJ2msm6clMCkdW9", name: "Jessica — confident female" },
-  { id: "JBFqnCBsd6RMkjVDRZzb", name: "George — mature male" },
-  { id: "onwK4e9ZLuTAKqWW03F9", name: "Daniel — british male" },
-  { id: "TX3LPaxmHKxFdv7VOQHJ", name: "Liam — youthful male" },
-  { id: "nPczCjzI2devNBz1zQrb", name: "Brian — deep male" },
-  { id: "iP95p4xoKVk53GoZ742B", name: "Chris — casual male" },
-  { id: "cjVigY5qzO86Huf0OWal", name: "Eric — smooth male" },
-  { id: "N2lVS1w4EtoT3dr4eOWO", name: "Callum — intense male" },
+  { id: "alloy", name: "Alloy — balanced neutral" },
+  { id: "nova", name: "Nova — bright female" },
+  { id: "shimmer", name: "Shimmer — warm female" },
+  { id: "coral", name: "Coral — friendly female" },
+  { id: "sage", name: "Sage — calm female" },
+  { id: "ballad", name: "Ballad — soft expressive" },
+  { id: "echo", name: "Echo — clear male" },
+  { id: "onyx", name: "Onyx — deep male" },
+  { id: "ash", name: "Ash — grounded male" },
+  { id: "fable", name: "Fable — storyteller" },
+  { id: "verse", name: "Verse — lively" },
 ];
 
 const VOICE_STORAGE_KEY = "harvestiq.voiceId";
