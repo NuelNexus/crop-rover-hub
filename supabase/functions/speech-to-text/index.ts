@@ -1,4 +1,4 @@
-// Speech-to-text via ElevenLabs Scribe (multilingual, accurate).
+// Speech-to-text via Lovable AI Gateway (OpenAI transcription).
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -24,22 +24,22 @@ Deno.serve(async (req) => {
       });
     }
 
-    const key = Deno.env.get("ELEVENLABS_API_KEY");
-    if (!key) throw new Error("ELEVENLABS_API_KEY missing");
+    const apiKey = Deno.env.get("LOVABLE_API_KEY");
+    if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
 
     const fd = new FormData();
     fd.append("file", file, file.name || "speech.webm");
-    fd.append("model_id", "scribe_v1");
+    fd.append("model", "openai/gpt-4o-transcribe");
 
-    const r = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
+    const r = await fetch("https://ai.gateway.lovable.dev/v1/audio/transcriptions", {
       method: "POST",
-      headers: { "xi-api-key": key },
+      headers: { "Lovable-API-Key": apiKey },
       body: fd,
     });
 
     if (!r.ok) {
       const t = await r.text().catch(() => "");
-      console.error("ElevenLabs STT error", r.status, t.slice(0, 400));
+      console.error("STT error", r.status, t.slice(0, 400));
       return new Response(JSON.stringify({ error: t.slice(0, 300) || "Transcription failed" }), {
         status: r.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
