@@ -1,6 +1,6 @@
-// Anthropic-powered chat, streamed as OpenAI-compatible SSE so existing
+// NVIDIA NIM powered chat, streamed as OpenAI-compatible SSE so existing
 // front-end consumers (AIAnalysisPage, SpeechToSpeech) work unchanged.
-import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+import { corsHeaders, nimFetch, NIM_TEXT_MODEL, NIM_VISION_MODEL, json } from "../_shared/nim.ts";
 
 const SYSTEM_PROMPT = `You are Harvest IQ AI, an expert agricultural assistant specializing in crops, livestock, pests, plant diseases, soil, weather, and farm operations.
 
@@ -11,128 +11,107 @@ When a user uploads an image:
 
 Always be specific, actionable, and concise. Use markdown formatting with bullet points and bold for key findings.`;
 
-const MODEL = 'claude-3-5-sonnet-20241022';
+function hasImage(content: unknown): boolean {
+  return Array.isArray(content) && content.some((p: any) => p?.type === "image_url");
+}
 
-// Convert an OpenAI-style message (string or content-parts array with image_url)
-// into Anthropic's content-block format.
-function toAnthropicContent(content: unknown): unknown {
-  if (typeof content === 'string') return content;
-  if (!Array.isArray(content)) return String(content ?? '');
-  return content.map((part: any) => {
-    if (part?.type === 'text') return { type: 'text', text: part.text };
-    if (part?.type === 'image_url') {
-      const url: string = part.image_url?.url ?? part.image_url ?? '';
-      const m = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(url);
-      if (m) {
-        return {
-          type: 'image',
-          source: { type: 'base64', media_type: m[1], data: m[2] },
-        };
-      }
-      return { type: 'image', source: { type: 'url', url } };
-    }
-    return { type: 'text', text: String(part?.text ?? '') };
-  });
+/** Flatten content-parts into a plain string (text-only models). */
+function flatten(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return String(content ?? "");
+  return content
+    .map((p: any) => (p?.type === "text" ? p.text : ""))
+    .filter(Boolean)
+    .join("\n");
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
     const { messages } = await req.json();
-    if (!Array.isArray(messages)) {
-      return new Response(JSON.stringify({ error: 'messages array required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    if (!Array.isArray(messages)) return json({ error: "messages array required" }, 400);
 
-    const key = Deno.env.get('ANTHROPIC_API_KEY');
-    if (!key) {
-      return new Response(JSON.stringify({ error: 'ANTHROPIC_API_KEY not configured' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    const imageTurn = messages.some((m: any) => hasImage(m?.content));
+    const model = imageTurn ? NIM_VISION_MODEL : NIM_TEXT_MODEL;
 
-    // Split system prompt(s) from turn messages; Anthropic wants system at top-level.
-    const systemParts: string[] = [];
-    const turns: { role: 'user' | 'assistant'; content: unknown }[] = [];
+    // Vision model handles one image turn best: keep parts on turns with images,
+    // flatten everything else.
+    const outMessages: any[] = [{ role: "system", content: SYSTEM_PROMPT }];
     for (const m of messages) {
-      if (m.role === 'system') {
-        if (typeof m.content === 'string') systemParts.push(m.content);
+      if (!m || !m.role) continue;
+      if (m.role === "system") {
+        outMessages[0].content += "\n\n" + flatten(m.content);
         continue;
       }
-      if (m.role === 'user' || m.role === 'assistant') {
-        turns.push({ role: m.role, content: toAnthropicContent(m.content) });
-      }
+      if (m.role !== "user" && m.role !== "assistant") continue;
+      outMessages.push({
+        role: m.role,
+        content: hasImage(m.content) ? m.content : flatten(m.content),
+      });
     }
-    const system = [SYSTEM_PROMPT, ...systemParts].join('\n\n');
 
-    const upstream = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 1500,
-        system,
-        messages: turns,
-        stream: true,
-      }),
+    const upstream = await nimFetch({
+      model,
+      messages: outMessages,
+      temperature: 0.7,
+      top_p: 1,
+      max_tokens: imageTurn ? 2048 : 4096,
+      stream: true,
     });
 
     if (!upstream.ok || !upstream.body) {
-      const errText = await upstream.text().catch(() => '');
-      console.error('Anthropic error', upstream.status, errText);
-      return new Response(
-        JSON.stringify({
-          error: upstream.status === 429
-            ? 'AI is busy right now — please try again in a moment.'
-            : errText || 'AI request failed',
-        }),
-        { status: upstream.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      const errText = await upstream.text().catch(() => "");
+      console.error("NIM error", upstream.status, errText.slice(0, 500));
+      return json(
+        {
+          error:
+            upstream.status === 429
+              ? "AI is busy right now — please try again in a moment."
+              : errText.slice(0, 300) || "AI request failed",
+        },
+        upstream.status,
       );
     }
 
-    // Transform Anthropic SSE → OpenAI-compatible chat.completion.chunk SSE.
+    // Pass through, filtering out reasoning-only deltas so the UI shows the answer.
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
     const stream = new ReadableStream({
       async start(controller) {
         const reader = upstream.body!.getReader();
-        let buf = '';
+        let buf = "";
         const emit = (delta: string) => {
-          const payload = { choices: [{ delta: { content: delta } }] };
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: delta } }] })}\n\n`),
+          );
         };
         try {
           while (true) {
             const { value, done } = await reader.read();
             if (done) break;
             buf += decoder.decode(value, { stream: true });
-            const lines = buf.split('\n');
-            buf = lines.pop() || '';
+            const lines = buf.split("\n");
+            buf = lines.pop() || "";
             for (const line of lines) {
               const trimmed = line.trim();
-              if (!trimmed.startsWith('data:')) continue;
+              if (!trimmed.startsWith("data:")) continue;
               const data = trimmed.slice(5).trim();
-              if (!data || data === '[DONE]') continue;
+              if (!data) continue;
+              if (data === "[DONE]") {
+                controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+                continue;
+              }
               try {
                 const j = JSON.parse(data);
-                if (j.type === 'content_block_delta' && j.delta?.type === 'text_delta') {
-                  emit(j.delta.text || '');
-                } else if (j.type === 'message_stop') {
-                  controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-                }
-              } catch {}
+                const d = j.choices?.[0]?.delta?.content;
+                if (d) emit(d);
+              } catch { /* ignore partial */ }
             }
           }
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         } catch (e) {
-          console.error('stream transform error', e);
+          console.error("stream error", e);
         } finally {
           controller.close();
         }
@@ -142,15 +121,12 @@ Deno.serve(async (req) => {
     return new Response(stream, {
       headers: {
         ...corsHeaders,
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
       },
     });
   } catch (e) {
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return json({ error: e instanceof Error ? e.message : String(e) }, 500);
   }
 });
