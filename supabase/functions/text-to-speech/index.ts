@@ -1,54 +1,46 @@
-// ElevenLabs multilingual TTS — natural across all supported languages.
+// Text-to-speech via Lovable AI Gateway (OpenAI TTS) — natural & multilingual.
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Default voice: Sarah (warm, multilingual-friendly)
-const DEFAULT_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
+const DEFAULT_VOICE = "alloy";
+const VALID = ["alloy", "ash", "ballad", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer", "verse"];
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const { text, voice, voiceId, lang } = await req.json();
+    const { text, voice, voiceId } = await req.json();
     if (!text) {
       return new Response(JSON.stringify({ error: "text required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const apiKey = Deno.env.get("ELEVENLABS_API_KEY");
-    if (!apiKey) throw new Error("ELEVENLABS_API_KEY missing");
 
-    const vid = voiceId || voice || DEFAULT_VOICE_ID;
-    const input = String(text).slice(0, 4500);
+    const apiKey = Deno.env.get("LOVABLE_API_KEY");
+    if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
 
-    const r = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${vid}?output_format=mp3_44100_128`,
-      {
-        method: "POST",
-        headers: {
-          "xi-api-key": apiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text: input,
-          model_id: "eleven_multilingual_v2",
-          voice_settings: {
-            stability: 0.45,
-            similarity_boost: 0.8,
-            style: 0.25,
-            use_speaker_boost: true,
-            speed: 1.0,
-          },
-        }),
-      }
-    );
+    const requested = String(voiceId || voice || "").toLowerCase();
+    const v = VALID.includes(requested) ? requested : DEFAULT_VOICE;
+    const input = String(text).slice(0, 4000);
+
+    const r = await fetch("https://ai.gateway.lovable.dev/v1/audio/speech", {
+      method: "POST",
+      headers: { "Lovable-API-Key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "openai/gpt-4o-mini-tts",
+        voice: v,
+        input,
+        instructions: "Speak warmly and naturally, like a friendly farm advisor. Match the language of the text.",
+      }),
+    });
 
     if (!r.ok) {
-      const t = await r.text();
-      console.error("ElevenLabs TTS error", r.status, t);
-      return new Response(JSON.stringify({ error: t || `TTS ${r.status}` }), {
+      const t = await r.text().catch(() => "");
+      console.error("TTS error", r.status, t.slice(0, 400));
+      return new Response(JSON.stringify({ error: t.slice(0, 300) || `TTS ${r.status}` }), {
         status: r.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
