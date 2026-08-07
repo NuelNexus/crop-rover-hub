@@ -47,9 +47,10 @@ const SpeechToSpeech = ({ onExit, history, onTurn }: Props) => {
   const [phase, setPhase] = useState<Phase>("idle");
   const [transcript, setTranscript] = useState("");
   const [reply, setReply] = useState("");
-  const [voiceId, setVoiceId] = useState<string>(
-    () => localStorage.getItem(VOICE_STORAGE_KEY) || VOICES[0].id
-  );
+  const [voiceId, setVoiceId] = useState<string>(() => {
+    const saved = localStorage.getItem(VOICE_STORAGE_KEY);
+    return VOICES.some((v) => v.id === saved) ? (saved as string) : VOICES[0].id;
+  });
   const [pendingAudioUrl, setPendingAudioUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
