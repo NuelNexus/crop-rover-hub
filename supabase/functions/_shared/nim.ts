@@ -1,6 +1,6 @@
 // Shared NVIDIA NIM (OpenAI-compatible) helpers for all Harvest IQ AI functions.
 export const NIM_BASE = "https://integrate.api.nvidia.com/v1";
-export const NIM_TEXT_MODEL = "z-ai/glm-5.2";
+export const NIM_TEXT_MODEL = "minimaxai/minimax-m3";
 export const NIM_VISION_MODEL = "meta/llama-3.2-90b-vision-instruct";
 
 export const corsHeaders = {
